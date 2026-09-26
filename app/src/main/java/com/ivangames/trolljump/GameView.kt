@@ -49,6 +49,10 @@ class GameView @JvmOverloads constructor(
     var jump = false
 
     var onLevelComplete: (() -> Unit)? = null
+    var onLevelCompleteWithStats: ((Int, Int) -> Unit)? = null
+
+    private var levelStartTime = 0L
+    private var currentTime = 0
 
     private var toneGen: ToneGenerator? = null
 
@@ -223,6 +227,9 @@ class GameView @JvmOverloads constructor(
             x += Random.nextFloat() * 200f + 150f
         }
         mountainPositions = mountainList
+
+        levelStartTime = System.currentTimeMillis()
+        currentTime = 0
 
         initialized = true
     }
@@ -592,7 +599,6 @@ private fun drawFallTrail(canvas: Canvas) {
         canvas.drawCircle(t.x, t.y, 10f, fallTrailPaint)
     }
 }
-
 private fun spawnWinParticles() {
     val doorCenterX = (levelData?.door?.left ?: 0f) + (levelData?.door?.width() ?: 0f) / 2f
     val doorCenterY = (levelData?.door?.top ?: 0f) + (levelData?.door?.height() ?: 0f) / 2f
@@ -636,85 +642,93 @@ private fun drawParticles(canvas: Canvas) {
         canvas.drawCircle(p.x, p.y, p.size, starPaint)
     }
 }
-    override fun onDraw(canvas: Canvas) {
-        super.onDraw(canvas)
 
-        if (!initialized && width > 0 && height > 0) {
-            setupLevel()
-        }
+override fun onDraw(canvas: Canvas) {
+    super.onDraw(canvas)
 
-        val data = levelData ?: return
-
-        drawBackground(canvas)
-
-        val w = width.toFloat()
-        val targetCamX = (playerX - w * 0.35f).coerceAtLeast(0f)
-        cameraX = cameraX + (targetCamX - cameraX) * 0.1f
-
-        canvas.save()
-        canvas.translate(-cameraX, 0f)
-
-        for (p in data.platforms) {
-            if (p.disappearing && p.gone) {
-                canvas.drawRect(p.rect, gonePaint)
-            } else if (p.disappearing && p.timer > 0) {
-                val blink = (p.timer / 5) % 2 == 0
-                canvas.drawRect(p.rect, if (blink) disappearingPaint else gonePaint)
-            } else {
-                canvas.drawRect(p.rect, platformPaint)
-
-                if (p.disappearing) {
-                    val cp = Paint().apply {
-                        color = Color.parseColor("#4A2A10")
-                        style = Paint.Style.STROKE
-                        strokeWidth = 2f
-                    }
-                    val r = p.rect
-                    canvas.drawLine(r.left + r.width() * 0.3f, r.top, r.left + r.width() * 0.4f, r.bottom, cp)
-                    canvas.drawLine(r.left + r.width() * 0.7f, r.top, r.left + r.width() * 0.6f, r.bottom, cp)
-                }
-            }
-        }
-
-        for (s in data.spikes) {
-            drawSpikes(canvas, s)
-        }
-
-        for (c in data.fallingCeilings) {
-            drawCeiling(canvas, c)
-        }
-
-        drawPortal(canvas, data.door)
-        drawDust(canvas)
-        drawFallTrail(canvas)
-        drawCharacter(canvas)
-        drawParticles(canvas)
-
-        canvas.restore()
-
-        hudPaint.textSize = height * 0.05f
-        canvas.drawText("💀 $deaths", 40f, height * 0.10f, hudPaint)
-
-        if (deathFlashTimer > 0) {
-            val alpha = (deathFlashTimer / 60f * 200).toInt().coerceIn(0, 200)
-            deathOverlayPaint.alpha = alpha
-            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), deathOverlayPaint)
-        }
-
-        if (winEffectActive) {
-            val winOverlay = Paint().apply {
-                color = Color.parseColor("#FFD700")
-                alpha = (winEffectTimer / 60f * 100).toInt().coerceIn(0, 100)
-            }
-            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), winOverlay)
-            winEffectTimer--
-            if (winEffectTimer <= 0) winEffectActive = false
-        }
-
-        update()
-        invalidate()
+    if (!initialized && width > 0 && height > 0) {
+        setupLevel()
     }
 
+    val data = levelData ?: return
+
+    drawBackground(canvas)
+
+    val w = width.toFloat()
+    val targetCamX = (playerX - w * 0.35f).coerceAtLeast(0f)
+    cameraX = cameraX + (targetCamX - cameraX) * 0.1f
+
+    canvas.save()
+    canvas.translate(-cameraX, 0f)
+
+    for (p in data.platforms) {
+        if (p.disappearing && p.gone) {
+            canvas.drawRect(p.rect, gonePaint)
+        } else if (p.disappearing && p.timer > 0) {
+            val blink = (p.timer / 5) % 2 == 0
+            canvas.drawRect(p.rect, if (blink) disappearingPaint else gonePaint)
+        } else {
+            canvas.drawRect(p.rect, platformPaint)
+
+            if (p.disappearing) {
+                val cp = Paint().apply {
+                    color = Color.parseColor("#4A2A10")
+                    style = Paint.Style.STROKE
+                    strokeWidth = 2f
+                }
+                val r = p.rect
+                canvas.drawLine(r.left + r.width() * 0.3f, r.top, r.left + r.width() * 0.4f, r.bottom, cp)
+                canvas.drawLine(r.left + r.width() * 0.7f, r.top, r.left + r.width() * 0.6f, r.bottom, cp)
+            }
+        }
+    }
+
+    for (s in data.spikes) {
+        drawSpikes(canvas, s)
+    }
+
+    for (c in data.fallingCeilings) {
+        drawCeiling(canvas, c)
+    }
+
+    drawPortal(canvas, data.door)
+    drawDust(canvas)
+    drawFallTrail(canvas)
+    drawCharacter(canvas)
+    drawParticles(canvas)
+
+    canvas.restore()
+
+    // HUD — счётчик смертей
+    hudPaint.textSize = height * 0.045f
+    canvas.drawText("💀 $deaths", 40f, height * 0.10f, hudPaint)
+
+    // HUD — таймер справа
+    val timeText = "⏱ $currentTime сек"
+    val timeWidth = hudPaint.measureText(timeText)
+    canvas.drawText(timeText, width - timeWidth - 40f, height * 0.10f, hudPaint)
+
+    // Красная вспышка при смерти
+    if (deathFlashTimer > 0) {
+        val alpha = (deathFlashTimer / 60f * 200).toInt().coerceIn(0, 200)
+        deathOverlayPaint.alpha = alpha
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), deathOverlayPaint)
+    }
+
+    // Золотая вспышка победы
+    if (winEffectActive) {
+        val winOverlay = Paint().apply {
+            color = Color.parseColor("#FFD700")
+            alpha = (winEffectTimer / 60f * 100).toInt().coerceIn(0, 100)
+        }
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), winOverlay)
+        winEffectTimer--
+        if (winEffectTimer <= 0) winEffectActive = false
+    }
+
+    update()
+    invalidate()
+}
     private fun update() {
         val data = levelData ?: return
 
@@ -813,6 +827,12 @@ private fun drawParticles(canvas: Canvas) {
         updateFallTrail()
         updateParticles()
 
+        // Таймер
+        if (!isDead && !winEffectActive) {
+            currentTime = ((System.currentTimeMillis() - levelStartTime) / 1000).toInt()
+        }
+
+        // Проверка победы
         if (RectF.intersects(data.door, RectF(playerX, playerY, playerX + playerSize, playerY + playerSize))) {
             if (!winEffectActive) {
                 playTone(ToneGenerator.TONE_PROP_ACK, 300)
@@ -820,6 +840,7 @@ private fun drawParticles(canvas: Canvas) {
                 winEffectTimer = 60
                 spawnWinParticles()
                 onLevelComplete?.invoke()
+                onLevelCompleteWithStats?.invoke(deaths, currentTime)
             }
         }
     }

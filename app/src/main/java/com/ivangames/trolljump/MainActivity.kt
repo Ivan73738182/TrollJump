@@ -58,12 +58,18 @@ class MainActivity : AppCompatActivity() {
             true
         }
 
-        gameView.onLevelComplete = {
-            ProgressManager.markCompleted(this, currentWorld, currentLevel)
-            winText.text = "Уровень $currentLevel пройден!"
-            winOverlay.visibility = FrameLayout.VISIBLE
-        }
+gameView.onLevelCompleteWithStats = { deaths, time ->
+    ProgressManager.markCompleted(this, currentWorld, currentLevel, deaths, time)
 
+    val medal = when {
+        deaths == 0 -> "🥇"
+        deaths <= 3 -> "🥈"
+        else -> "🥉"
+    }
+
+    winText.text = "Уровень $currentLevel пройден!\n$medal   Смертей: $deaths   Время: $time сек"
+    winOverlay.visibility = FrameLayout.VISIBLE
+}
 findViewById<Button>(R.id.winBackBtn).setOnClickListener {
     val intent = Intent(this, LevelSelectActivity::class.java)
     intent.putExtra("world", currentWorld)
