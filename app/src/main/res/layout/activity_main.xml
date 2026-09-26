@@ -52,4 +52,52 @@
 
     </LinearLayout>
 
+    <!-- Оверлей победы -->
+    <FrameLayout
+        android:id="@+id/winOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#CC000000"
+        android:visibility="gone"
+        android:clickable="true"
+        android:focusable="true">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:orientation="vertical"
+            android:gravity="center">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🏆"
+                android:textSize="72sp" />
+
+            <TextView
+                android:id="@+id/winText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Уровень 1 пройден!"
+                android:textColor="#FFC107"
+                android:textSize="32sp"
+                android:textStyle="bold"
+                android:layout_marginTop="16dp" />
+
+            <Button
+                android:id="@+id/winBackBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="К УРОВНЯМ"
+                android:textSize="20sp"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#2E7D32"
+                android:padding="20dp"
+                android:layout_marginTop="32dp" />
+
+        </LinearLayout>
+
+    </FrameLayout>
+
 </FrameLayout>

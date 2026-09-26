@@ -47,6 +47,7 @@ class GameView @JvmOverloads constructor(
     var moveLeft = false
     var moveRight = false
     var jump = false
+    var onLevelComplete: (() -> Unit)? = null
 
     // Краски
     private val playerPaint = Paint().apply {
@@ -271,10 +272,9 @@ class GameView @JvmOverloads constructor(
             return
         }
 
-        if (RectF.intersects(doorRect, RectF(playerX, playerY, playerX + playerSize, playerY + playerSize))) {
-            setupLevel()
-            deaths = 0
-        }
+if (RectF.intersects(doorRect, RectF(playerX, playerY, playerX + playerSize, playerY + playerSize))) {
+    onLevelComplete?.invoke()
+}
     }
 
     private fun die() {

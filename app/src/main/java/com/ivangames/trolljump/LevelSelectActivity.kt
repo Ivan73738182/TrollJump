@@ -23,12 +23,22 @@ class LevelSelectActivity : AppCompatActivity() {
 
         buttons.forEachIndexed { index, button ->
             val levelNumber = index + 1
-            button.text = "Уровень $levelNumber"
-            button.setOnClickListener {
-                val intent = Intent(this, MainActivity::class.java)
-                intent.putExtra("world", world)
-                intent.putExtra("level", levelNumber)
-                startActivity(intent)
+            val unlocked = ProgressManager.isLevelUnlocked(this, world, levelNumber)
+
+            if (unlocked) {
+                button.text = "УРОВЕНЬ $levelNumber"
+                button.backgroundTintList = android.content.res.ColorStateList.valueOf(0xFF2E7D32.toInt())
+                button.isEnabled = true
+                button.setOnClickListener {
+                    val intent = Intent(this, MainActivity::class.java)
+                    intent.putExtra("world", world)
+                    intent.putExtra("level", levelNumber)
+                    startActivity(intent)
+                }
+            } else {
+                button.text = "🔒 УРОВЕНЬ $levelNumber"
+                button.backgroundTintList = android.content.res.ColorStateList.valueOf(0xFF333333.toInt())
+                button.isEnabled = false
             }
         }
 
