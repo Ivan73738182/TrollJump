@@ -766,9 +766,9 @@ override fun onDraw(canvas: Canvas) {
                     if (!wasOnGround) {
                         playTone(ToneGenerator.TONE_PROP_BEEP2, 60)
                     }
-                    if (p.disappearing && p.timer == 0) {
-                        p.timer = 60
-                    }
+if (p.disappearing && p.timer == 0) {
+    p.timer = 20  // было 60 — стало 0.33 сек
+}
                 }
             }
         }
