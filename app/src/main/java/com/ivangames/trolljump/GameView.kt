@@ -160,7 +160,7 @@ class GameView @JvmOverloads constructor(
         val h = height.toFloat()
 
         applyWorldColors()
-        levelData = Levels.buildLevel(levelNumber, w, h)
+        levelData = Levels.buildLevel(world, levelNumber, w, h)
 
         playerX = w * 0.10f
         playerY = h * 0.85f - playerSize
