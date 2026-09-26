@@ -108,6 +108,15 @@ class GameView @JvmOverloads constructor(
         color = Color.parseColor("#5D4037")
         style = Paint.Style.FILL
     }
+    private val crackPaint = Paint().apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 3f
+        isAntiAlias = true
+    }
+    private val spikeEyePaint = Paint().apply {
+        color = Color.parseColor("#4A0000")
+        style = Paint.Style.FILL
+    }
 
     private var treePositions: List<Float> = emptyList()
     private var mountainPositions: List<Float> = emptyList()
@@ -123,22 +132,22 @@ class GameView @JvmOverloads constructor(
     private fun applyWorldColors() {
         when (world) {
             "mountains" -> {
-                platformColor = "#78909C"      // серый камень
-                disappearingColor = "#90A4AE"  // светло-серый
-                spikeColor = "#81D4FA"         // голубые сосульки
+                platformColor = "#78909C"
+                disappearingColor = "#90A4AE"
+                spikeColor = "#81D4FA"
                 ceilingColor = "#546E7A"
                 ceilingActiveColor = "#37474F"
-                doorColor = "#FFFFFF"          // белая дверь
+                doorColor = "#FFFFFF"
             }
             "sea" -> {
-                platformColor = "#FFE0B2"      // песочный
+                platformColor = "#FFE0B2"
                 disappearingColor = "#FFCC80"
-                spikeColor = "#AB47BC"         // фиолетовые кораллы
+                spikeColor = "#AB47BC"
                 ceilingColor = "#0288D1"
                 ceilingActiveColor = "#01579B"
-                doorColor = "#00E5FF"          // бирюзовая дверь
+                doorColor = "#00E5FF"
             }
-            else -> { // forest
+            else -> {
                 platformColor = "#8B7355"
                 disappearingColor = "#A0522D"
                 spikeColor = "#E53935"
@@ -171,7 +180,6 @@ class GameView @JvmOverloads constructor(
         deathFlashTimer = 0
         cameraX = 0f
 
-        // Генерируем позиции деревьев
         val totalWidth = w * 3f
         val treeList = mutableListOf<Float>()
         var x = 0f
@@ -181,7 +189,6 @@ class GameView @JvmOverloads constructor(
         }
         treePositions = treeList
 
-        // Генерируем позиции гор
         val mountainList = mutableListOf<Float>()
         x = 0f
         while (x < totalWidth) {
@@ -219,7 +226,6 @@ class GameView @JvmOverloads constructor(
         canvas.drawRect(0f, 0f, w, h, bgPaint)
         bgPaint.shader = null
 
-        // Далёкие горы
         val mountainPath = Path()
         mountainPath.moveTo(0f, h * 0.75f)
         var mx = 0f
@@ -255,12 +261,10 @@ class GameView @JvmOverloads constructor(
             canvas.drawRect(screenX + size * 0.3f, baseY - size * 0.9f, screenX + size * 0.7f, baseY - size * 0.6f, treePaint)
         }
     }
-
     private fun drawMountainBackground(canvas: Canvas) {
         val w = width.toFloat()
         val h = height.toFloat()
 
-        // Небо — холодное, серо-синее
         val skyShader = LinearGradient(
             0f, 0f, 0f, h,
             intArrayOf(
@@ -275,11 +279,10 @@ class GameView @JvmOverloads constructor(
         canvas.drawRect(0f, 0f, w, h, bgPaint)
         bgPaint.shader = null
 
-        // Снежные горы (параллакс)
         val camOffset = cameraX
-        drawMountainLayer(canvas, camOffset * 0.3f, 0.75f, 120f, Color.parseColor("#E0E8F0"))  // далёкие (снег)
-        drawMountainLayer(canvas, camOffset * 0.6f, 0.82f, 160f, Color.parseColor("#B0C0D0"))  // средние
-        drawMountainLayer(canvas, camOffset * 0.9f, 0.88f, 200f, Color.parseColor("#8090A0"))  // ближние
+        drawMountainLayer(canvas, camOffset * 0.3f, 0.75f, 120f, Color.parseColor("#E0E8F0"))
+        drawMountainLayer(canvas, camOffset * 0.6f, 0.82f, 160f, Color.parseColor("#B0C0D0"))
+        drawMountainLayer(canvas, camOffset * 0.9f, 0.88f, 200f, Color.parseColor("#8090A0"))
     }
 
     private fun drawMountainLayer(canvas: Canvas, offset: Float, baseYRatio: Float, size: Float, color: Int) {
@@ -309,13 +312,12 @@ class GameView @JvmOverloads constructor(
         val w = width.toFloat()
         val h = height.toFloat()
 
-        // Вода — сверху вниз, тёмно-синяя → бирюзовая
         val skyShader = LinearGradient(
             0f, 0f, 0f, h,
             intArrayOf(
-                Color.parseColor("#0D47A1"),  // глубокое море
-                Color.parseColor("#1976D2"),  // синее
-                Color.parseColor("#00ACC1")   // бирюзовое
+                Color.parseColor("#0D47A1"),
+                Color.parseColor("#1976D2"),
+                Color.parseColor("#00ACC1")
             ),
             floatArrayOf(0f, 0.5f, 1f),
             Shader.TileMode.CLAMP
@@ -324,7 +326,6 @@ class GameView @JvmOverloads constructor(
         canvas.drawRect(0f, 0f, w, h, bgPaint)
         bgPaint.shader = null
 
-        // Пузырьки (пиксельные кружки)
         val bubblePaint = Paint().apply {
             color = Color.parseColor("#80E0FF")
             style = Paint.Style.FILL
@@ -338,7 +339,6 @@ class GameView @JvmOverloads constructor(
             canvas.drawCircle(bx, by, bs, bubblePaint)
         }
 
-        // Водоросли снизу
         val weedPaint = Paint().apply {
             color = Color.parseColor("#1B5E20")
             style = Paint.Style.FILL
@@ -350,6 +350,57 @@ class GameView @JvmOverloads constructor(
                 val offsetX = j * 12f - 12f
                 canvas.drawRect(wx + offsetX, baseY - 60f + j * 10f, wx + offsetX + 8f, baseY, weedPaint)
             }
+        }
+    }
+
+    private fun drawSpikes(canvas: Canvas, rect: RectF) {
+        val spikeWidth = rect.width() / 5f
+        val spikeHeight = rect.height()
+        val baseY = rect.bottom
+
+        for (i in 0 until 5) {
+            val x = rect.left + i * spikeWidth
+            val path = Path()
+            path.moveTo(x, baseY)
+            path.lineTo(x + spikeWidth / 2f, baseY - spikeHeight)
+            path.lineTo(x + spikeWidth, baseY)
+            path.close()
+            canvas.drawPath(path, spikePaint)
+        }
+
+        for (i in 0 until 5) {
+            val x = rect.left + i * spikeWidth + spikeWidth / 2f
+            canvas.drawCircle(x, baseY - spikeHeight * 0.3f, spikeWidth * 0.08f, spikeEyePaint)
+        }
+    }
+
+    private fun drawCeiling(canvas: Canvas, c: FallingCeiling) {
+        val paint = if (c.triggered) ceilingActivePaint else ceilingPaint
+        canvas.drawRect(c.rect, paint)
+
+        crackPaint.color = if (c.triggered) Color.parseColor("#2A0000") else Color.parseColor("#333333")
+
+        val w = c.rect.width()
+        val h = c.rect.height()
+
+        val path1 = Path()
+        path1.moveTo(c.rect.left + w * 0.25f, c.rect.top)
+        path1.lineTo(c.rect.left + w * 0.30f, c.rect.top + h * 0.5f)
+        path1.lineTo(c.rect.left + w * 0.22f, c.rect.bottom)
+        canvas.drawPath(path1, crackPaint)
+
+        val path2 = Path()
+        path2.moveTo(c.rect.left + w * 0.65f, c.rect.top)
+        path2.lineTo(c.rect.left + w * 0.72f, c.rect.top + h * 0.6f)
+        path2.lineTo(c.rect.left + w * 0.68f, c.rect.bottom)
+        canvas.drawPath(path2, crackPaint)
+
+        if (c.triggered) {
+            val glowPaint = Paint().apply {
+                color = Color.parseColor("#66FF0000")
+                style = Paint.Style.FILL
+            }
+            canvas.drawRect(c.rect, glowPaint)
         }
     }
 
@@ -437,18 +488,30 @@ class GameView @JvmOverloads constructor(
             if (p.disappearing && p.gone) {
                 canvas.drawRect(p.rect, gonePaint)
             } else if (p.disappearing && p.timer > 0) {
-                canvas.drawRect(p.rect, disappearingPaint)
+                val blink = (p.timer / 5) % 2 == 0
+                canvas.drawRect(p.rect, if (blink) disappearingPaint else gonePaint)
             } else {
                 canvas.drawRect(p.rect, platformPaint)
+
+                if (p.disappearing) {
+                    val cp = Paint().apply {
+                        color = Color.parseColor("#4A2A10")
+                        style = Paint.Style.STROKE
+                        strokeWidth = 2f
+                    }
+                    val r = p.rect
+                    canvas.drawLine(r.left + r.width() * 0.3f, r.top, r.left + r.width() * 0.4f, r.bottom, cp)
+                    canvas.drawLine(r.left + r.width() * 0.7f, r.top, r.left + r.width() * 0.6f, r.bottom, cp)
+                }
             }
         }
 
         for (s in data.spikes) {
-            canvas.drawRect(s, spikePaint)
+            drawSpikes(canvas, s)
         }
 
         for (c in data.fallingCeilings) {
-            canvas.drawRect(c.rect, if (c.triggered) ceilingActivePaint else ceilingPaint)
+            drawCeiling(canvas, c)
         }
 
         canvas.drawRect(data.door, doorPaint)
