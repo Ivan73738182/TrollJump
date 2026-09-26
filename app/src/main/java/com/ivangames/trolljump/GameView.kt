@@ -63,33 +63,21 @@ class GameView @JvmOverloads constructor(
     private var ceilingActiveColor = "#B71C1C"
     private var doorColor = "#4FC3F7"
 
-    // Эффекты
     private var particleList = mutableListOf<Particle>()
     private var dustList = mutableListOf<Dust>()
+    private var fallTrailList = mutableListOf<FallTrail>()
     private var winEffectActive = false
     private var winEffectTimer = 0
 
     class Particle(var x: Float, var y: Float, var vx: Float, var vy: Float, var life: Int, var size: Float)
     class Dust(var x: Float, var y: Float, var vx: Float, var vy: Float, var life: Int)
+    class FallTrail(var x: Float, var y: Float, var life: Int)
 
     private val platformPaint = Paint().apply { style = Paint.Style.FILL }
     private val disappearingPaint = Paint().apply { style = Paint.Style.FILL }
     private val gonePaint = Paint().apply {
         color = Color.parseColor("#333333")
         style = Paint.Style.FILL
-    }
-    private val doorPaint = Paint().apply { style = Paint.Style.FILL }
-    private val doorDarkPaint = Paint().apply {
-        color = Color.parseColor("#2A2A2A")
-        style = Paint.Style.FILL
-    }
-    private val doorHandlePaint = Paint().apply {
-        color = Color.parseColor("#FFC107")
-        style = Paint.Style.FILL
-    }
-    private val doorGlowPaint = Paint().apply {
-        style = Paint.Style.FILL
-        isAntiAlias = true
     }
     private val spikePaint = Paint().apply { style = Paint.Style.FILL }
     private val ceilingPaint = Paint().apply { style = Paint.Style.FILL }
@@ -138,9 +126,23 @@ class GameView @JvmOverloads constructor(
         style = Paint.Style.FILL
         isAntiAlias = true
     }
+    private val portalPaint = Paint().apply {
+        style = Paint.Style.FILL
+        isAntiAlias = true
+    }
+    private val portalGlowPaint = Paint().apply {
+        style = Paint.Style.FILL
+        isAntiAlias = true
+    }
+    private val fallTrailPaint = Paint().apply {
+        color = Color.parseColor("#88AAAAAA")
+        style = Paint.Style.FILL
+        isAntiAlias = true
+    }
 
     private var treePositions: List<Float> = emptyList()
     private var mountainPositions: List<Float> = emptyList()
+    private var portalPulse = 0f
 
     init {
         try {
@@ -182,7 +184,6 @@ class GameView @JvmOverloads constructor(
         spikePaint.color = Color.parseColor(spikeColor)
         ceilingPaint.color = Color.parseColor(ceilingColor)
         ceilingActivePaint.color = Color.parseColor(ceilingActiveColor)
-        doorPaint.color = Color.parseColor(doorColor)
     }
 
     private fun setupLevel() {
@@ -202,6 +203,7 @@ class GameView @JvmOverloads constructor(
         cameraX = 0f
         particleList.clear()
         dustList.clear()
+        fallTrailList.clear()
         winEffectActive = false
         winEffectTimer = 0
 
@@ -286,228 +288,246 @@ class GameView @JvmOverloads constructor(
             canvas.drawRect(screenX + size * 0.3f, baseY - size * 0.9f, screenX + size * 0.7f, baseY - size * 0.6f, treePaint)
         }
     }
-    private fun drawMountainBackground(canvas: Canvas) {
-        val w = width.toFloat()
-        val h = height.toFloat()
+private fun drawMountainBackground(canvas: Canvas) {
+    val w = width.toFloat()
+    val h = height.toFloat()
 
-        val skyShader = LinearGradient(
-            0f, 0f, 0f, h,
-            intArrayOf(
-                Color.parseColor("#4A6B8A"),
-                Color.parseColor("#7BA0C0"),
-                Color.parseColor("#2A3A4A")
-            ),
-            floatArrayOf(0f, 0.5f, 1f),
-            Shader.TileMode.CLAMP
-        )
-        bgPaint.shader = skyShader
-        canvas.drawRect(0f, 0f, w, h, bgPaint)
-        bgPaint.shader = null
+    val skyShader = LinearGradient(
+        0f, 0f, 0f, h,
+        intArrayOf(
+            Color.parseColor("#4A6B8A"),
+            Color.parseColor("#7BA0C0"),
+            Color.parseColor("#2A3A4A")
+        ),
+        floatArrayOf(0f, 0.5f, 1f),
+        Shader.TileMode.CLAMP
+    )
+    bgPaint.shader = skyShader
+    canvas.drawRect(0f, 0f, w, h, bgPaint)
+    bgPaint.shader = null
 
-        val camOffset = cameraX
-        drawMountainLayer(canvas, camOffset * 0.3f, 0.75f, 120f, Color.parseColor("#E0E8F0"))
-        drawMountainLayer(canvas, camOffset * 0.6f, 0.82f, 160f, Color.parseColor("#B0C0D0"))
-        drawMountainLayer(canvas, camOffset * 0.9f, 0.88f, 200f, Color.parseColor("#8090A0"))
+    val camOffset = cameraX
+    drawMountainLayer(canvas, camOffset * 0.3f, 0.75f, 120f, Color.parseColor("#E0E8F0"))
+    drawMountainLayer(canvas, camOffset * 0.6f, 0.82f, 160f, Color.parseColor("#B0C0D0"))
+    drawMountainLayer(canvas, camOffset * 0.9f, 0.88f, 200f, Color.parseColor("#8090A0"))
+}
+
+private fun drawMountainLayer(canvas: Canvas, offset: Float, baseYRatio: Float, size: Float, color: Int) {
+    val h = height.toFloat()
+    val baseY = h * baseYRatio
+
+    val paint = Paint().apply {
+        this.color = color
+        style = Paint.Style.FILL
+        isAntiAlias = true
     }
 
-    private fun drawMountainLayer(canvas: Canvas, offset: Float, baseYRatio: Float, size: Float, color: Int) {
-        val h = height.toFloat()
-        val baseY = h * baseYRatio
+    for (mountainX in mountainPositions) {
+        val screenX = mountainX - offset
+        if (screenX < -size * 2 || screenX > width + size * 2) continue
 
-        val paint = Paint().apply {
-            this.color = color
+        val path = Path()
+        path.moveTo(screenX, baseY)
+        path.lineTo(screenX + size / 2, baseY - size * 0.6f)
+        path.lineTo(screenX + size, baseY)
+        path.close()
+        canvas.drawPath(path, paint)
+    }
+}
+
+private fun drawSeaBackground(canvas: Canvas) {
+    val w = width.toFloat()
+    val h = height.toFloat()
+
+    val skyShader = LinearGradient(
+        0f, 0f, 0f, h,
+        intArrayOf(
+            Color.parseColor("#0D47A1"),
+            Color.parseColor("#1976D2"),
+            Color.parseColor("#00ACC1")
+        ),
+        floatArrayOf(0f, 0.5f, 1f),
+        Shader.TileMode.CLAMP
+    )
+    bgPaint.shader = skyShader
+    canvas.drawRect(0f, 0f, w, h, bgPaint)
+    bgPaint.shader = null
+
+    val bubblePaint = Paint().apply {
+        color = Color.parseColor("#80E0FF")
+        style = Paint.Style.FILL
+        alpha = 120
+    }
+    val camOffset = cameraX
+    for (i in 0 until 40) {
+        val bx = (i * 137f - camOffset * 0.5f) % (w + 200f) - 100f
+        val by = (i * 73f) % h
+        val bs = 8f + (i % 5) * 4f
+        canvas.drawCircle(bx, by, bs, bubblePaint)
+    }
+
+    val weedPaint = Paint().apply {
+        color = Color.parseColor("#1B5E20")
+        style = Paint.Style.FILL
+    }
+    for (i in 0 until 20) {
+        val wx = (i * 200f - camOffset * 0.7f) % (w + 400f) - 200f
+        val baseY = h * 0.92f
+        for (j in 0 until 3) {
+            val offsetX = j * 12f - 12f
+            canvas.drawRect(wx + offsetX, baseY - 60f + j * 10f, wx + offsetX + 8f, baseY, weedPaint)
+        }
+    }
+}
+
+private fun drawSpikes(canvas: Canvas, rect: RectF) {
+    val spikeWidth = rect.width() / 5f
+    val spikeHeight = rect.height()
+    val baseY = rect.bottom
+
+    for (i in 0 until 5) {
+        val x = rect.left + i * spikeWidth
+        val path = Path()
+        path.moveTo(x, baseY)
+        path.lineTo(x + spikeWidth / 2f, baseY - spikeHeight)
+        path.lineTo(x + spikeWidth, baseY)
+        path.close()
+        canvas.drawPath(path, spikePaint)
+    }
+
+    for (i in 0 until 5) {
+        val x = rect.left + i * spikeWidth + spikeWidth / 2f
+        canvas.drawCircle(x, baseY - spikeHeight * 0.3f, spikeWidth * 0.08f, spikeEyePaint)
+    }
+}
+
+private fun drawCeiling(canvas: Canvas, c: FallingCeiling) {
+    val paint = if (c.triggered) ceilingActivePaint else ceilingPaint
+    canvas.drawRect(c.rect, paint)
+
+    crackPaint.color = if (c.triggered) Color.parseColor("#2A0000") else Color.parseColor("#333333")
+
+    val w = c.rect.width()
+    val h = c.rect.height()
+
+    val path1 = Path()
+    path1.moveTo(c.rect.left + w * 0.25f, c.rect.top)
+    path1.lineTo(c.rect.left + w * 0.30f, c.rect.top + h * 0.5f)
+    path1.lineTo(c.rect.left + w * 0.22f, c.rect.bottom)
+    canvas.drawPath(path1, crackPaint)
+
+    val path2 = Path()
+    path2.moveTo(c.rect.left + w * 0.65f, c.rect.top)
+    path2.lineTo(c.rect.left + w * 0.72f, c.rect.top + h * 0.6f)
+    path2.lineTo(c.rect.left + w * 0.68f, c.rect.bottom)
+    canvas.drawPath(path2, crackPaint)
+
+    if (c.triggered) {
+        val glowPaint = Paint().apply {
+            color = Color.parseColor("#66FF0000")
             style = Paint.Style.FILL
+        }
+        canvas.drawRect(c.rect, glowPaint)
+    }
+}
+
+private fun drawPortal(canvas: Canvas, rect: RectF) {
+    val cx = rect.centerX()
+    val cy = rect.centerY()
+    val baseRadius = minOf(rect.width(), rect.height()) / 2f
+
+    portalPulse = (portalPulse + 0.05f) % (2f * Math.PI.toFloat())
+    val pulse = Math.sin(portalPulse.toDouble()).toFloat() * 0.15f + 1f
+
+    portalGlowPaint.color = Color.parseColor(doorColor)
+    portalGlowPaint.alpha = 80
+    canvas.drawCircle(cx, cy, baseRadius * 1.4f * pulse, portalGlowPaint)
+
+    portalGlowPaint.alpha = 50
+    canvas.drawCircle(cx, cy, baseRadius * 1.7f * pulse, portalGlowPaint)
+
+    portalPaint.color = Color.parseColor("#1A1A1A")
+    canvas.drawCircle(cx, cy, baseRadius, portalPaint)
+
+    portalPaint.color = Color.parseColor(doorColor)
+    canvas.drawCircle(cx, cy, baseRadius * 0.85f, portalPaint)
+
+    portalPaint.color = Color.WHITE
+    canvas.drawCircle(cx, cy, baseRadius * 0.4f * pulse, portalPaint)
+
+    val sparkPaint = Paint().apply {
+        color = Color.WHITE
+        style = Paint.Style.FILL
+        isAntiAlias = true
+    }
+    for (i in 0 until 5) {
+        val angle = (portalPulse + i * 1.2f) % (2f * Math.PI.toFloat())
+        val dist = baseRadius * 0.6f
+        val sx = cx + Math.cos(angle.toDouble()).toFloat() * dist
+        val sy = cy + Math.sin(angle.toDouble()).toFloat() * dist
+        sparkPaint.alpha = 200
+        canvas.drawCircle(sx, sy, 4f, sparkPaint)
+    }
+}
+
+private fun drawCharacter(canvas: Canvas) {
+    val size = playerSize
+    val px = playerX
+    val py = playerY
+
+    if (velocityX != 0f && onGround) {
+        isWalking = true
+        walkTimer = (walkTimer + 1) % 20
+        if (velocityX > 0) facingRight = true
+        else if (velocityX < 0) facingRight = false
+    } else {
+        isWalking = false
+    }
+
+    val legOffset = if (isWalking) {
+        if (walkTimer < 10) 6f else -6f
+    } else 0f
+
+    val headW = size * 0.40f
+    val headH = size * 0.30f
+    val headX = px + size * 0.30f
+    val headY = py
+
+    val bodyW = size * 0.70f
+    val bodyH = size * 0.40f
+    val bodyX = px + size * 0.15f
+    val bodyY = py + size * 0.30f
+
+    val legW = size * 0.20f
+    val legH = size * 0.30f
+    val legY = py + size * 0.70f
+    val leftLegX = px + size * 0.20f + legOffset
+    val rightLegX = px + size * 0.60f - legOffset
+
+    canvas.drawRect(leftLegX, legY, leftLegX + legW, legY + legH, charPaint)
+    canvas.drawRect(rightLegX, legY, rightLegX + legW, legY + legH, charPaint)
+    canvas.drawRect(bodyX, bodyY, bodyX + bodyW, bodyY + bodyH, charPaint)
+    canvas.drawRect(headX, headY, headX + headW, headY + headH, charPaint)
+
+    if (isDead) {
+        val crossSize = size * 0.10f
+        val crossThick = size * 0.02f
+        val eyeY = headY + headH * 0.45f
+        val leftEyeX = headX + headW * 0.30f
+        val rightEyeX = headX + headW * 0.70f
+
+        val crossPaint = Paint().apply {
+            color = Color.WHITE
+            style = Paint.Style.STROKE
+            strokeWidth = crossThick
             isAntiAlias = true
         }
 
-        for (mountainX in mountainPositions) {
-            val screenX = mountainX - offset
-            if (screenX < -size * 2 || screenX > width + size * 2) continue
-
-            val path = Path()
-            path.moveTo(screenX, baseY)
-            path.lineTo(screenX + size / 2, baseY - size * 0.6f)
-            path.lineTo(screenX + size, baseY)
-            path.close()
-            canvas.drawPath(path, paint)
-        }
-    }
-
-    private fun drawSeaBackground(canvas: Canvas) {
-        val w = width.toFloat()
-        val h = height.toFloat()
-
-        val skyShader = LinearGradient(
-            0f, 0f, 0f, h,
-            intArrayOf(
-                Color.parseColor("#0D47A1"),
-                Color.parseColor("#1976D2"),
-                Color.parseColor("#00ACC1")
-            ),
-            floatArrayOf(0f, 0.5f, 1f),
-            Shader.TileMode.CLAMP
-        )
-        bgPaint.shader = skyShader
-        canvas.drawRect(0f, 0f, w, h, bgPaint)
-        bgPaint.shader = null
-
-        val bubblePaint = Paint().apply {
-            color = Color.parseColor("#80E0FF")
-            style = Paint.Style.FILL
-            alpha = 120
-        }
-        val camOffset = cameraX
-        for (i in 0 until 40) {
-            val bx = (i * 137f - camOffset * 0.5f) % (w + 200f) - 100f
-            val by = (i * 73f) % h
-            val bs = 8f + (i % 5) * 4f
-            canvas.drawCircle(bx, by, bs, bubblePaint)
-        }
-
-        val weedPaint = Paint().apply {
-            color = Color.parseColor("#1B5E20")
-            style = Paint.Style.FILL
-        }
-        for (i in 0 until 20) {
-            val wx = (i * 200f - camOffset * 0.7f) % (w + 400f) - 200f
-            val baseY = h * 0.92f
-            for (j in 0 until 3) {
-                val offsetX = j * 12f - 12f
-                canvas.drawRect(wx + offsetX, baseY - 60f + j * 10f, wx + offsetX + 8f, baseY, weedPaint)
-            }
-        }
-    }
-
-    private fun drawSpikes(canvas: Canvas, rect: RectF) {
-        val spikeWidth = rect.width() / 5f
-        val spikeHeight = rect.height()
-        val baseY = rect.bottom
-
-        for (i in 0 until 5) {
-            val x = rect.left + i * spikeWidth
-            val path = Path()
-            path.moveTo(x, baseY)
-            path.lineTo(x + spikeWidth / 2f, baseY - spikeHeight)
-            path.lineTo(x + spikeWidth, baseY)
-            path.close()
-            canvas.drawPath(path, spikePaint)
-        }
-
-        for (i in 0 until 5) {
-            val x = rect.left + i * spikeWidth + spikeWidth / 2f
-            canvas.drawCircle(x, baseY - spikeHeight * 0.3f, spikeWidth * 0.08f, spikeEyePaint)
-        }
-    }
-
-    private fun drawCeiling(canvas: Canvas, c: FallingCeiling) {
-        val paint = if (c.triggered) ceilingActivePaint else ceilingPaint
-        canvas.drawRect(c.rect, paint)
-
-        crackPaint.color = if (c.triggered) Color.parseColor("#2A0000") else Color.parseColor("#333333")
-
-        val w = c.rect.width()
-        val h = c.rect.height()
-
-        val path1 = Path()
-        path1.moveTo(c.rect.left + w * 0.25f, c.rect.top)
-        path1.lineTo(c.rect.left + w * 0.30f, c.rect.top + h * 0.5f)
-        path1.lineTo(c.rect.left + w * 0.22f, c.rect.bottom)
-        canvas.drawPath(path1, crackPaint)
-
-        val path2 = Path()
-        path2.moveTo(c.rect.left + w * 0.65f, c.rect.top)
-        path2.lineTo(c.rect.left + w * 0.72f, c.rect.top + h * 0.6f)
-        path2.lineTo(c.rect.left + w * 0.68f, c.rect.bottom)
-        canvas.drawPath(path2, crackPaint)
-
-        if (c.triggered) {
-            val glowPaint = Paint().apply {
-                color = Color.parseColor("#66FF0000")
-                style = Paint.Style.FILL
-            }
-            canvas.drawRect(c.rect, glowPaint)
-        }
-    }
-
-    private fun drawDoor(canvas: Canvas, rect: RectF) {
-        val w = rect.width()
-        val h = rect.height()
-
-        // Свечение вокруг двери
-        doorGlowPaint.color = Color.parseColor(doorColor)
-        doorGlowPaint.alpha = 80
-        canvas.drawRect(
-            rect.left - 8f, rect.top - 8f,
-            rect.right + 8f, rect.bottom + 8f,
-            doorGlowPaint
-        )
-
-        // Основа двери
-        canvas.drawRect(rect, doorPaint)
-
-        // Тёмная рамка
-        val borderPaint = Paint().apply {
-            color = Color.parseColor("#1A1A1A")
-            style = Paint.Style.STROKE
-            strokeWidth = 4f
-        }
-        canvas.drawRect(rect, borderPaint)
-
-        // Внутренняя арка (тёмная часть двери)
-        val arcRect = RectF(
-            rect.left + w * 0.15f,
-            rect.top + h * 0.10f,
-            rect.right - w * 0.15f,
-            rect.bottom - h * 0.25f
-        )
-        canvas.drawRect(arcRect, doorDarkPaint)
-
-        // Ручка двери
-        val handleX = rect.left + w * 0.75f
-        val handleY = rect.top + h * 0.55f
-        val handleSize = w * 0.12f
-        canvas.drawCircle(handleX, handleY, handleSize, doorHandlePaint)
-    }
-
-    private fun drawCharacter(canvas: Canvas) {
-        val size = playerSize
-        val px = playerX
-        val py = playerY
-
-        if (velocityX != 0f && onGround) {
-            isWalking = true
-            walkTimer = (walkTimer + 1) % 20
-            if (velocityX > 0) facingRight = true
-            else if (velocityX < 0) facingRight = false
-        } else {
-            isWalking = false
-        }
-
-        val legOffset = if (isWalking) {
-            if (walkTimer < 10) 6f else -6f
-        } else 0f
-
-        val headW = size * 0.40f
-        val headH = size * 0.30f
-        val headX = px + size * 0.30f
-        val headY = py
-
-        val bodyW = size * 0.70f
-        val bodyH = size * 0.40f
-        val bodyX = px + size * 0.15f
-        val bodyY = py + size * 0.30f
-
-        val legW = size * 0.20f
-        val legH = size * 0.30f
-        val legY = py + size * 0.70f
-        val leftLegX = px + size * 0.20f + legOffset
-        val rightLegX = px + size * 0.60f - legOffset
-
-        canvas.drawRect(leftLegX, legY, leftLegX + legW, legY + legH, charPaint)
-        canvas.drawRect(rightLegX, legY, rightLegX + legW, legY + legH, charPaint)
-        canvas.drawRect(bodyX, bodyY, bodyX + bodyW, bodyY + bodyH, charPaint)
-        canvas.drawRect(headX, headY, headX + headW, headY + headH, charPaint)
-
+        canvas.drawLine(leftEyeX - crossSize, eyeY - crossSize, leftEyeX + crossSize, eyeY + crossSize, crossPaint)
+        canvas.drawLine(leftEyeX + crossSize, eyeY - crossSize, leftEyeX - crossSize, eyeY + crossSize, crossPaint)
+        canvas.drawLine(rightEyeX - crossSize, eyeY - crossSize, rightEyeX + crossSize, eyeY + crossSize, crossPaint)
+        canvas.drawLine(rightEyeX + crossSize, eyeY - crossSize, rightEyeX - crossSize, eyeY + crossSize, crossPaint)
+    } else {
         val eyeSize = size * 0.06f
         val eyeY = headY + headH * 0.40f
         val eyeSpacing = size * 0.09f
@@ -515,93 +535,107 @@ class GameView @JvmOverloads constructor(
         val eyeShift = if (facingRight) size * 0.06f else -size * 0.06f
         val eyeCenterX = headX + headW / 2f + eyeShift
 
-        canvas.drawRect(
-            eyeCenterX - eyeSpacing / 2f - eyeSize / 2f,
-            eyeY,
-            eyeCenterX - eyeSpacing / 2f + eyeSize / 2f,
-            eyeY + eyeSize,
-            charPaintWhite
-        )
-        canvas.drawRect(
-            eyeCenterX + eyeSpacing / 2f - eyeSize / 2f,
-            eyeY,
-            eyeCenterX + eyeSpacing / 2f + eyeSize / 2f,
-            eyeY + eyeSize,
-            charPaintWhite
-        )
+        canvas.drawRect(eyeCenterX - eyeSpacing / 2f - eyeSize / 2f, eyeY, eyeCenterX - eyeSpacing / 2f + eyeSize / 2f, eyeY + eyeSize, charPaintWhite)
+        canvas.drawRect(eyeCenterX + eyeSpacing / 2f - eyeSize / 2f, eyeY, eyeCenterX + eyeSpacing / 2f + eyeSize / 2f, eyeY + eyeSize, charPaintWhite)
     }
+}
 
-    private fun spawnDust() {
-        if (!onGround || velocityX == 0f) return
-        val dustX = playerX + playerSize / 2f
-        val dustY = playerY + playerSize
-        dustList.add(Dust(dustX, dustY, -velocityX * 0.3f + Random.nextFloat() * 2f - 1f, -Random.nextFloat() * 2f, 20))
+private fun spawnDust() {
+    if (!onGround || velocityX == 0f) return
+    val dustX = playerX + playerSize / 2f
+    val dustY = playerY + playerSize
+    dustList.add(Dust(dustX, dustY, -velocityX * 0.3f + Random.nextFloat() * 2f - 1f, -Random.nextFloat() * 2f, 20))
+}
+
+private fun updateDust() {
+    val iter = dustList.iterator()
+    while (iter.hasNext()) {
+        val d = iter.next()
+        d.x += d.vx
+        d.y += d.vy
+        d.vy += 0.2f
+        d.life--
+        if (d.life <= 0) iter.remove()
     }
+}
 
-    private fun updateDust() {
-        val iter = dustList.iterator()
-        while (iter.hasNext()) {
-            val d = iter.next()
-            d.x += d.vx
-            d.y += d.vy
-            d.vy += 0.2f
-            d.life--
-            if (d.life <= 0) iter.remove()
-        }
+private fun drawDust(canvas: Canvas) {
+    for (d in dustList) {
+        val alpha = (d.life / 20f * 200).toInt().coerceIn(0, 200)
+        dustPaint.alpha = alpha
+        canvas.drawCircle(d.x, d.y, 6f, dustPaint)
     }
+}
 
-    private fun drawDust(canvas: Canvas) {
-        for (d in dustList) {
-            val alpha = (d.life / 20f * 200).toInt().coerceIn(0, 200)
-            dustPaint.alpha = alpha
-            canvas.drawCircle(d.x, d.y, 6f, dustPaint)
-        }
+private fun spawnFallTrail() {
+    if (velocityY < 15f) return
+    fallTrailList.add(FallTrail(
+        playerX + playerSize / 2f,
+        playerY + playerSize / 2f,
+        15
+    ))
+}
+
+private fun updateFallTrail() {
+    val iter = fallTrailList.iterator()
+    while (iter.hasNext()) {
+        val t = iter.next()
+        t.life--
+        if (t.life <= 0) iter.remove()
     }
+}
 
-    private fun spawnWinParticles() {
-        val doorCenterX = (levelData?.door?.left ?: 0f) + (levelData?.door?.width() ?: 0f) / 2f
-        val doorCenterY = (levelData?.door?.top ?: 0f) + (levelData?.door?.height() ?: 0f) / 2f
-        for (i in 0 until 60) {
-            val angle = Random.nextFloat() * 2f * Math.PI.toFloat()
-            val speed = Random.nextFloat() * 8f + 3f
-            particleList.add(Particle(
-                doorCenterX, doorCenterY,
-                Math.cos(angle.toDouble()).toFloat() * speed,
-                Math.sin(angle.toDouble()).toFloat() * speed,
-                60,
-                Random.nextFloat() * 8f + 4f
-            ))
-        }
+private fun drawFallTrail(canvas: Canvas) {
+    for (t in fallTrailList) {
+        val alpha = (t.life / 15f * 150).toInt().coerceIn(0, 150)
+        fallTrailPaint.alpha = alpha
+        canvas.drawCircle(t.x, t.y, 10f, fallTrailPaint)
     }
+}
 
-    private fun updateParticles() {
-        val iter = particleList.iterator()
-        while (iter.hasNext()) {
-            val p = iter.next()
-            p.x += p.vx
-            p.y += p.vy
-            p.vy += 0.3f
-            p.vx *= 0.98f
-            p.life--
-            if (p.life <= 0) iter.remove()
-        }
+private fun spawnWinParticles() {
+    val doorCenterX = (levelData?.door?.left ?: 0f) + (levelData?.door?.width() ?: 0f) / 2f
+    val doorCenterY = (levelData?.door?.top ?: 0f) + (levelData?.door?.height() ?: 0f) / 2f
+    for (i in 0 until 60) {
+        val angle = Random.nextFloat() * 2f * Math.PI.toFloat()
+        val speed = Random.nextFloat() * 8f + 3f
+        particleList.add(Particle(
+            doorCenterX, doorCenterY,
+            Math.cos(angle.toDouble()).toFloat() * speed,
+            Math.sin(angle.toDouble()).toFloat() * speed,
+            60,
+            Random.nextFloat() * 8f + 4f
+        ))
     }
+}
 
-    private fun drawParticles(canvas: Canvas) {
-        val colors = intArrayOf(
-            Color.parseColor("#FFC107"),
-            Color.parseColor("#FFEB3B"),
-            Color.parseColor("#FF9800"),
-            Color.parseColor("#FFFFFF")
-        )
-        for (p in particleList) {
-            val alpha = (p.life / 60f * 255).toInt().coerceIn(0, 255)
-            starPaint.color = colors[Random.nextInt(colors.size)]
-            starPaint.alpha = alpha
-            canvas.drawCircle(p.x, p.y, p.size, starPaint)
-        }
+private fun updateParticles() {
+    val iter = particleList.iterator()
+    while (iter.hasNext()) {
+        val p = iter.next()
+        p.x += p.vx
+        p.y += p.vy
+        p.vy += 0.3f
+        p.vx *= 0.98f
+        p.life--
+        if (p.life <= 0) iter.remove()
     }
+}
 
+private fun drawParticles(canvas: Canvas) {
+    val colors = intArrayOf(
+        Color.parseColor("#FFC107"),
+        Color.parseColor("#FFEB3B"),
+        Color.parseColor("#FF9800"),
+        Color.parseColor("#FFFFFF")
+    )
+    for (p in particleList) {
+        val alpha = (p.life / 60f * 255).toInt().coerceIn(0, 255)
+        starPaint.color = colors[Random.nextInt(colors.size)]
+        starPaint.alpha = alpha
+        canvas.drawCircle(p.x, p.y, p.size, starPaint)
+    }
+}
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
@@ -620,7 +654,6 @@ class GameView @JvmOverloads constructor(
         canvas.save()
         canvas.translate(-cameraX, 0f)
 
-        // Платформы
         for (p in data.platforms) {
             if (p.disappearing && p.gone) {
                 canvas.drawRect(p.rect, gonePaint)
@@ -643,42 +676,31 @@ class GameView @JvmOverloads constructor(
             }
         }
 
-        // Шипы
         for (s in data.spikes) {
             drawSpikes(canvas, s)
         }
 
-        // Потолки
         for (c in data.fallingCeilings) {
             drawCeiling(canvas, c)
         }
 
-        // Дверь
-        drawDoor(canvas, data.door)
-
-        // Пыль под ногами
+        drawPortal(canvas, data.door)
         drawDust(canvas)
-
-        // Персонаж
+        drawFallTrail(canvas)
         drawCharacter(canvas)
-
-        // Частицы победы
         drawParticles(canvas)
 
         canvas.restore()
 
-        // HUD
         hudPaint.textSize = height * 0.05f
         canvas.drawText("💀 $deaths", 40f, height * 0.10f, hudPaint)
 
-        // Красная вспышка
         if (deathFlashTimer > 0) {
-            val alpha = (deathFlashTimer / 30f * 200).toInt().coerceIn(0, 200)
+            val alpha = (deathFlashTimer / 60f * 200).toInt().coerceIn(0, 200)
             deathOverlayPaint.alpha = alpha
             canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), deathOverlayPaint)
         }
 
-        // Золотая вспышка победы
         if (winEffectActive) {
             val winOverlay = Paint().apply {
                 color = Color.parseColor("#FFD700")
@@ -712,6 +734,7 @@ class GameView @JvmOverloads constructor(
 
         playerX += velocityX
 
+        val wasOnGround = onGround
         velocityY += gravity
         playerY += velocityY
 
@@ -724,6 +747,9 @@ class GameView @JvmOverloads constructor(
                     playerY = r.top - playerSize
                     velocityY = 0f
                     onGround = true
+                    if (!wasOnGround) {
+                        playTone(ToneGenerator.TONE_PROP_BEEP2, 60)
+                    }
                     if (p.disappearing && p.timer == 0) {
                         p.timer = 60
                     }
@@ -776,14 +802,17 @@ class GameView @JvmOverloads constructor(
             return
         }
 
-        // Пыль при беге
         if (isWalking && walkTimer % 3 == 0) {
             spawnDust()
         }
+        if (velocityY > 15f) {
+            spawnFallTrail()
+        }
+
         updateDust()
+        updateFallTrail()
         updateParticles()
 
-        // Проверка двери
         if (RectF.intersects(data.door, RectF(playerX, playerY, playerX + playerSize, playerY + playerSize))) {
             if (!winEffectActive) {
                 playTone(ToneGenerator.TONE_PROP_ACK, 300)
@@ -799,8 +828,8 @@ class GameView @JvmOverloads constructor(
         if (isDead) return
         isDead = true
         deaths++
-        deathFlashTimer = 30
-        playTone(ToneGenerator.TONE_CDMA_ABBR_ALERT, 200)
+        deathFlashTimer = 60
+        playTone(ToneGenerator.TONE_CDMA_ABBR_ALERT, 300)
     }
 
     private fun performRespawn() {
@@ -821,6 +850,8 @@ class GameView @JvmOverloads constructor(
             c.rect.top = height * 0.05f
             c.rect.bottom = height * 0.15f
         }
+        dustList.clear()
+        fallTrailList.clear()
         isDead = false
     }
 
