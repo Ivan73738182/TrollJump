@@ -31,6 +31,11 @@ class GameView @JvmOverloads constructor(
     // Камера
     private var cameraX = 0f
 
+    // Смерть
+    private var deaths = 0
+    private var deathFlashTimer = 0
+    private var isDead = false
+
     // Уровень
     private val platforms = mutableListOf<Platform>()
     private val spikes = mutableListOf<RectF>()
@@ -76,8 +81,17 @@ class GameView @JvmOverloads constructor(
         color = Color.parseColor("#B71C1C")
         style = Paint.Style.FILL
     }
+    private val deathOverlayPaint = Paint().apply {
+        color = Color.parseColor("#CCFF0000")
+        style = Paint.Style.FILL
+    }
+    private val hudPaint = Paint().apply {
+        color = Color.WHITE
+        textSize = 50f
+        isAntiAlias = true
+        isFakeBoldText = true
+    }
 
-    // Классы-объекты
     class Platform(val rect: RectF, val disappearing: Boolean = false) {
         var timer = 0
         var gone = false
@@ -97,29 +111,18 @@ class GameView @JvmOverloads constructor(
         spikes.clear()
         fallingCeilings.clear()
 
-        // Пол — 3 экрана в ширину
         platforms.add(Platform(RectF(0f, h * 0.85f, w * 3f, h * 0.90f)))
-
-        // Ступенька
         platforms.add(Platform(RectF(w * 0.40f, h * 0.65f, w * 0.60f, h * 0.68f)))
-
-        // Исчезающая платформа
         platforms.add(Platform(RectF(w * 0.85f, h * 0.75f, w * 1.10f, h * 0.78f), true))
-
-        // Верхняя платформа
         platforms.add(Platform(RectF(w * 1.30f, h * 0.55f, w * 1.60f, h * 0.58f)))
 
-        // Шипы
         spikes.add(RectF(w * 0.70f, h * 0.82f, w * 0.78f, h * 0.85f))
         spikes.add(RectF(w * 1.90f, h * 0.82f, w * 2.00f, h * 0.85f))
 
-        // Падающий потолок (триггерится, когда игрок подходит)
         fallingCeilings.add(FallingCeiling(RectF(w * 1.15f, h * 0.05f, w * 1.35f, h * 0.15f), w * 1.00f))
 
-        // Дверь в конце уровня
         doorRect = RectF(w * 2.70f, h * 0.75f, w * 2.78f, h * 0.85f)
 
-        // Игрок — на полу, слева
         playerX = w * 0.10f
         playerY = h * 0.85f - playerSize
         spawnX = playerX
@@ -137,7 +140,6 @@ class GameView @JvmOverloads constructor(
 
         canvas.drawColor(Color.parseColor("#1A1A1A"))
 
-        // Камера
         val w = width.toFloat()
         val targetCamX = (playerX - w * 0.35f).coerceAtLeast(0f)
         cameraX = cameraX + (targetCamX - cameraX) * 0.1f
@@ -145,7 +147,6 @@ class GameView @JvmOverloads constructor(
         canvas.save()
         canvas.translate(-cameraX, 0f)
 
-        // Платформы
         for (p in platforms) {
             if (p.disappearing && p.gone) {
                 canvas.drawRect(p.rect, gonePaint)
@@ -156,20 +157,16 @@ class GameView @JvmOverloads constructor(
             }
         }
 
-        // Шипы
         for (s in spikes) {
             canvas.drawRect(s, spikePaint)
         }
 
-        // Падающий потолок
         for (c in fallingCeilings) {
             canvas.drawRect(c.rect, if (c.triggered) ceilingActivePaint else ceilingPaint)
         }
 
-        // Дверь
         canvas.drawRect(doorRect, doorPaint)
 
-        // Игрок
         canvas.drawRect(
             playerX, playerY,
             playerX + playerSize, playerY + playerSize,
@@ -178,23 +175,42 @@ class GameView @JvmOverloads constructor(
 
         canvas.restore()
 
+        // HUD — счётчик смертей (поверх всего, не в камере)
+        hudPaint.textSize = height * 0.05f
+        canvas.drawText("💀 $deaths", 40f, height * 0.10f, hudPaint)
+
+        // Красная вспышка при смерти
+        if (deathFlashTimer > 0) {
+            val alpha = (deathFlashTimer / 30f * 200).toInt().coerceIn(0, 200)
+            deathOverlayPaint.alpha = alpha
+            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), deathOverlayPaint)
+        }
+
         update()
         invalidate()
     }
 
     private fun update() {
-        // Горизонтальное движение
+        // Красная вспышка
+        if (deathFlashTimer > 0) {
+            deathFlashTimer--
+            if (deathFlashTimer == 0) {
+                performRespawn()
+            }
+            return
+        }
+
+        if (isDead) return
+
         if (moveLeft) velocityX = -moveSpeed
         else if (moveRight) velocityX = moveSpeed
         else velocityX = 0f
 
         playerX += velocityX
 
-        // Гравитация
         velocityY += gravity
         playerY += velocityY
 
-        // Приземление
         onGround = false
         for (p in platforms) {
             if (p.gone) continue
@@ -204,15 +220,13 @@ class GameView @JvmOverloads constructor(
                     playerY = r.top - playerSize
                     velocityY = 0f
                     onGround = true
-                    // Активируем исчезающий пол
                     if (p.disappearing && p.timer == 0) {
-                        p.timer = 60  // ~1 секунда при 60fps
+                        p.timer = 60
                     }
                 }
             }
         }
 
-        // Таймеры исчезающих платформ
         for (p in platforms) {
             if (p.disappearing && p.timer > 0 && !p.gone) {
                 p.timer--
@@ -220,7 +234,6 @@ class GameView @JvmOverloads constructor(
             }
         }
 
-        // Триггер падающего потолка
         for (c in fallingCeilings) {
             if (!c.triggered && playerX > c.triggerX) {
                 c.triggered = true
@@ -229,51 +242,54 @@ class GameView @JvmOverloads constructor(
                 c.velocityY += 2f
                 c.rect.top += c.velocityY
                 c.rect.bottom += c.velocityY
-                // Если достиг пола — остановить
                 if (c.rect.bottom >= height * 0.85f) {
                     c.fallen = true
                 }
-                // Проверка столкновения с игроком
                 if (RectF.intersects(c.rect, RectF(playerX, playerY, playerX + playerSize, playerY + playerSize))) {
-                    respawn()
+                    die()
+                    return
                 }
             }
         }
 
-        // Проверка шипов
         for (s in spikes) {
             if (RectF.intersects(s, RectF(playerX, playerY, playerX + playerSize, playerY + playerSize))) {
-                respawn()
+                die()
+                return
             }
         }
 
-        // Прыжок
         if (jump && onGround) {
             velocityY = jumpPower
             onGround = false
         }
 
-        // Границы
         if (playerX < 0) playerX = 0f
 
-        // Падение вниз — респавн
         if (playerY > height + 300) {
-            respawn()
+            die()
+            return
         }
 
-        // Проверка двери — победа
         if (RectF.intersects(doorRect, RectF(playerX, playerY, playerX + playerSize, playerY + playerSize))) {
-            setupLevel()  // пока перезапуск уровня
+            setupLevel()
+            deaths = 0
         }
     }
 
-    private fun respawn() {
+    private fun die() {
+        if (isDead) return
+        isDead = true
+        deaths++
+        deathFlashTimer = 30  // ~0.5 секунды
+    }
+
+    private fun performRespawn() {
         playerX = spawnX
         playerY = spawnY
         velocityX = 0f
         velocityY = 0f
         cameraX = 0f
-        // Сброс ловушек
         for (p in platforms) {
             p.timer = 0
             p.gone = false
@@ -285,5 +301,6 @@ class GameView @JvmOverloads constructor(
             c.rect.top = height * 0.05f
             c.rect.bottom = height * 0.15f
         }
+        isDead = false
     }
 }
