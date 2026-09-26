@@ -71,6 +71,7 @@ class GameView @JvmOverloads constructor(
     private var dustList = mutableListOf<Dust>()
     private var fallTrailList = mutableListOf<FallTrail>()
     private var winEffectActive = false
+    private var levelCompleted = false
     private var winEffectTimer = 0
 
     class Particle(var x: Float, var y: Float, var vx: Float, var vy: Float, var life: Int, var size: Float)
@@ -210,6 +211,7 @@ class GameView @JvmOverloads constructor(
         fallTrailList.clear()
         winEffectActive = false
         winEffectTimer = 0
+        levelCompleted = false
 
         val totalWidth = w * 3f
         val treeList = mutableListOf<Float>()
@@ -828,21 +830,21 @@ override fun onDraw(canvas: Canvas) {
         updateParticles()
 
         // Таймер
-        if (!isDead && !winEffectActive) {
-            currentTime = ((System.currentTimeMillis() - levelStartTime) / 1000).toInt()
-        }
-
+if (!isDead && !winEffectActive && !levelCompleted) {
+    currentTime = ((System.currentTimeMillis() - levelStartTime) / 1000).toInt()
+}
         // Проверка победы
-        if (RectF.intersects(data.door, RectF(playerX, playerY, playerX + playerSize, playerY + playerSize))) {
-            if (!winEffectActive) {
-                playTone(ToneGenerator.TONE_PROP_ACK, 300)
-                winEffectActive = true
-                winEffectTimer = 60
-                spawnWinParticles()
-                onLevelComplete?.invoke()
-                onLevelCompleteWithStats?.invoke(deaths, currentTime)
-            }
-        }
+if (RectF.intersects(data.door, RectF(playerX, playerY, playerX + playerSize, playerY + playerSize))) {
+    if (!levelCompleted) {
+        levelCompleted = true
+        playTone(ToneGenerator.TONE_PROP_ACK, 300)
+        winEffectActive = true
+        winEffectTimer = 60
+        spawnWinParticles()
+        onLevelComplete?.invoke()
+        onLevelCompleteWithStats?.invoke(deaths, currentTime)
+    }
+}
     }
 
     private fun die() {
