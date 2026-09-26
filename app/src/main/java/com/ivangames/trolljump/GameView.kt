@@ -22,7 +22,6 @@ class GameView @JvmOverloads constructor(
     var levelNumber = 1
     var world = "forest"
 
-    // Игрок
     private var playerX = 200f
     private var playerY = 400f
     private var playerSize = 80f
@@ -31,46 +30,47 @@ class GameView @JvmOverloads constructor(
     private var spawnX = 200f
     private var spawnY = 400f
 
-    // Физика
     private val gravity = 1.5f
     private val jumpPower = -25f
     private val moveSpeed = 10f
     private var onGround = false
 
-    // Камера
     private var cameraX = 0f
 
-    // Смерть
     private var deaths = 0
     private var deathFlashTimer = 0
     private var isDead = false
 
-    // Уровень
     private var levelData: LevelData? = null
     private var initialized = false
 
-    // Управление
     var moveLeft = false
     var moveRight = false
     var jump = false
 
     var onLevelComplete: (() -> Unit)? = null
 
-    // Звук
     private var toneGen: ToneGenerator? = null
 
-    // Анимация
     private var walkTimer = 0
     private var facingRight = true
     private var isWalking = false
 
-    // Краски (будут меняться в зависимости от мира)
     private var platformColor = "#8B7355"
     private var disappearingColor = "#A0522D"
     private var spikeColor = "#E53935"
     private var ceilingColor = "#666666"
     private var ceilingActiveColor = "#B71C1C"
     private var doorColor = "#4FC3F7"
+
+    // Эффекты
+    private var particleList = mutableListOf<Particle>()
+    private var dustList = mutableListOf<Dust>()
+    private var winEffectActive = false
+    private var winEffectTimer = 0
+
+    class Particle(var x: Float, var y: Float, var vx: Float, var vy: Float, var life: Int, var size: Float)
+    class Dust(var x: Float, var y: Float, var vx: Float, var vy: Float, var life: Int)
 
     private val platformPaint = Paint().apply { style = Paint.Style.FILL }
     private val disappearingPaint = Paint().apply { style = Paint.Style.FILL }
@@ -79,6 +79,18 @@ class GameView @JvmOverloads constructor(
         style = Paint.Style.FILL
     }
     private val doorPaint = Paint().apply { style = Paint.Style.FILL }
+    private val doorDarkPaint = Paint().apply {
+        color = Color.parseColor("#2A2A2A")
+        style = Paint.Style.FILL
+    }
+    private val doorHandlePaint = Paint().apply {
+        color = Color.parseColor("#FFC107")
+        style = Paint.Style.FILL
+    }
+    private val doorGlowPaint = Paint().apply {
+        style = Paint.Style.FILL
+        isAntiAlias = true
+    }
     private val spikePaint = Paint().apply { style = Paint.Style.FILL }
     private val ceilingPaint = Paint().apply { style = Paint.Style.FILL }
     private val ceilingActivePaint = Paint().apply { style = Paint.Style.FILL }
@@ -116,6 +128,15 @@ class GameView @JvmOverloads constructor(
     private val spikeEyePaint = Paint().apply {
         color = Color.parseColor("#4A0000")
         style = Paint.Style.FILL
+    }
+    private val dustPaint = Paint().apply {
+        color = Color.parseColor("#CCCCCC")
+        style = Paint.Style.FILL
+        isAntiAlias = true
+    }
+    private val starPaint = Paint().apply {
+        style = Paint.Style.FILL
+        isAntiAlias = true
     }
 
     private var treePositions: List<Float> = emptyList()
@@ -179,6 +200,10 @@ class GameView @JvmOverloads constructor(
         isDead = false
         deathFlashTimer = 0
         cameraX = 0f
+        particleList.clear()
+        dustList.clear()
+        winEffectActive = false
+        winEffectTimer = 0
 
         val totalWidth = w * 3f
         val treeList = mutableListOf<Float>()
@@ -404,6 +429,46 @@ class GameView @JvmOverloads constructor(
         }
     }
 
+    private fun drawDoor(canvas: Canvas, rect: RectF) {
+        val w = rect.width()
+        val h = rect.height()
+
+        // Свечение вокруг двери
+        doorGlowPaint.color = Color.parseColor(doorColor)
+        doorGlowPaint.alpha = 80
+        canvas.drawRect(
+            rect.left - 8f, rect.top - 8f,
+            rect.right + 8f, rect.bottom + 8f,
+            doorGlowPaint
+        )
+
+        // Основа двери
+        canvas.drawRect(rect, doorPaint)
+
+        // Тёмная рамка
+        val borderPaint = Paint().apply {
+            color = Color.parseColor("#1A1A1A")
+            style = Paint.Style.STROKE
+            strokeWidth = 4f
+        }
+        canvas.drawRect(rect, borderPaint)
+
+        // Внутренняя арка (тёмная часть двери)
+        val arcRect = RectF(
+            rect.left + w * 0.15f,
+            rect.top + h * 0.10f,
+            rect.right - w * 0.15f,
+            rect.bottom - h * 0.25f
+        )
+        canvas.drawRect(arcRect, doorDarkPaint)
+
+        // Ручка двери
+        val handleX = rect.left + w * 0.75f
+        val handleY = rect.top + h * 0.55f
+        val handleSize = w * 0.12f
+        canvas.drawCircle(handleX, handleY, handleSize, doorHandlePaint)
+    }
+
     private fun drawCharacter(canvas: Canvas) {
         val size = playerSize
         val px = playerX
@@ -466,6 +531,77 @@ class GameView @JvmOverloads constructor(
         )
     }
 
+    private fun spawnDust() {
+        if (!onGround || velocityX == 0f) return
+        val dustX = playerX + playerSize / 2f
+        val dustY = playerY + playerSize
+        dustList.add(Dust(dustX, dustY, -velocityX * 0.3f + Random.nextFloat() * 2f - 1f, -Random.nextFloat() * 2f, 20))
+    }
+
+    private fun updateDust() {
+        val iter = dustList.iterator()
+        while (iter.hasNext()) {
+            val d = iter.next()
+            d.x += d.vx
+            d.y += d.vy
+            d.vy += 0.2f
+            d.life--
+            if (d.life <= 0) iter.remove()
+        }
+    }
+
+    private fun drawDust(canvas: Canvas) {
+        for (d in dustList) {
+            val alpha = (d.life / 20f * 200).toInt().coerceIn(0, 200)
+            dustPaint.alpha = alpha
+            canvas.drawCircle(d.x, d.y, 6f, dustPaint)
+        }
+    }
+
+    private fun spawnWinParticles() {
+        val doorCenterX = (levelData?.door?.left ?: 0f) + (levelData?.door?.width() ?: 0f) / 2f
+        val doorCenterY = (levelData?.door?.top ?: 0f) + (levelData?.door?.height() ?: 0f) / 2f
+        for (i in 0 until 60) {
+            val angle = Random.nextFloat() * 2f * Math.PI.toFloat()
+            val speed = Random.nextFloat() * 8f + 3f
+            particleList.add(Particle(
+                doorCenterX, doorCenterY,
+                Math.cos(angle.toDouble()).toFloat() * speed,
+                Math.sin(angle.toDouble()).toFloat() * speed,
+                60,
+                Random.nextFloat() * 8f + 4f
+            ))
+        }
+    }
+
+    private fun updateParticles() {
+        val iter = particleList.iterator()
+        while (iter.hasNext()) {
+            val p = iter.next()
+            p.x += p.vx
+            p.y += p.vy
+            p.vy += 0.3f
+            p.vx *= 0.98f
+            p.life--
+            if (p.life <= 0) iter.remove()
+        }
+    }
+
+    private fun drawParticles(canvas: Canvas) {
+        val colors = intArrayOf(
+            Color.parseColor("#FFC107"),
+            Color.parseColor("#FFEB3B"),
+            Color.parseColor("#FF9800"),
+            Color.parseColor("#FFFFFF")
+        )
+        for (p in particleList) {
+            val alpha = (p.life / 60f * 255).toInt().coerceIn(0, 255)
+            starPaint.color = colors[Random.nextInt(colors.size)]
+            starPaint.alpha = alpha
+            canvas.drawCircle(p.x, p.y, p.size, starPaint)
+        }
+    }
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
@@ -484,6 +620,7 @@ class GameView @JvmOverloads constructor(
         canvas.save()
         canvas.translate(-cameraX, 0f)
 
+        // Платформы
         for (p in data.platforms) {
             if (p.disappearing && p.gone) {
                 canvas.drawRect(p.rect, gonePaint)
@@ -506,26 +643,50 @@ class GameView @JvmOverloads constructor(
             }
         }
 
+        // Шипы
         for (s in data.spikes) {
             drawSpikes(canvas, s)
         }
 
+        // Потолки
         for (c in data.fallingCeilings) {
             drawCeiling(canvas, c)
         }
 
-        canvas.drawRect(data.door, doorPaint)
+        // Дверь
+        drawDoor(canvas, data.door)
+
+        // Пыль под ногами
+        drawDust(canvas)
+
+        // Персонаж
         drawCharacter(canvas)
+
+        // Частицы победы
+        drawParticles(canvas)
 
         canvas.restore()
 
+        // HUD
         hudPaint.textSize = height * 0.05f
         canvas.drawText("💀 $deaths", 40f, height * 0.10f, hudPaint)
 
+        // Красная вспышка
         if (deathFlashTimer > 0) {
             val alpha = (deathFlashTimer / 30f * 200).toInt().coerceIn(0, 200)
             deathOverlayPaint.alpha = alpha
             canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), deathOverlayPaint)
+        }
+
+        // Золотая вспышка победы
+        if (winEffectActive) {
+            val winOverlay = Paint().apply {
+                color = Color.parseColor("#FFD700")
+                alpha = (winEffectTimer / 60f * 100).toInt().coerceIn(0, 100)
+            }
+            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), winOverlay)
+            winEffectTimer--
+            if (winEffectTimer <= 0) winEffectActive = false
         }
 
         update()
@@ -615,9 +776,22 @@ class GameView @JvmOverloads constructor(
             return
         }
 
+        // Пыль при беге
+        if (isWalking && walkTimer % 3 == 0) {
+            spawnDust()
+        }
+        updateDust()
+        updateParticles()
+
+        // Проверка двери
         if (RectF.intersects(data.door, RectF(playerX, playerY, playerX + playerSize, playerY + playerSize))) {
-            playTone(ToneGenerator.TONE_PROP_ACK, 300)
-            onLevelComplete?.invoke()
+            if (!winEffectActive) {
+                playTone(ToneGenerator.TONE_PROP_ACK, 300)
+                winEffectActive = true
+                winEffectTimer = 60
+                spawnWinParticles()
+                onLevelComplete?.invoke()
+            }
         }
     }
 
