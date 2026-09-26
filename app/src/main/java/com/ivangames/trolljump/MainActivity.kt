@@ -26,6 +26,7 @@ class MainActivity : AppCompatActivity() {
 
         gameView = findViewById(R.id.gameView)
         gameView.levelNumber = currentLevel
+        gameView.world = currentWorld
         winOverlay = findViewById(R.id.winOverlay)
         winText = findViewById(R.id.winText)
 

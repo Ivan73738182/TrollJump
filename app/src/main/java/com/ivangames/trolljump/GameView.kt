@@ -3,12 +3,16 @@ package com.ivangames.trolljump
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RectF
+import android.graphics.Shader
 import android.media.AudioManager
 import android.media.ToneGenerator
 import android.util.AttributeSet
 import android.view.View
+import kotlin.random.Random
 
 class GameView @JvmOverloads constructor(
     context: Context,
@@ -16,6 +20,7 @@ class GameView @JvmOverloads constructor(
 ) : View(context, attrs) {
 
     var levelNumber = 1
+    var world = "forest"
 
     // Игрок
     private var playerX = 200f
@@ -97,6 +102,32 @@ class GameView @JvmOverloads constructor(
         isAntiAlias = true
         isFakeBoldText = true
     }
+    private val bgPaint = Paint().apply {
+        style = Paint.Style.FILL
+        isAntiAlias = true
+    }
+    private val farTreePaint = Paint().apply {
+        color = Color.parseColor("#1B4A2E")
+        style = Paint.Style.FILL
+        isAntiAlias = true
+    }
+    private val midTreePaint = Paint().apply {
+        color = Color.parseColor("#236B3F")
+        style = Paint.Style.FILL
+        isAntiAlias = true
+    }
+    private val nearTreePaint = Paint().apply {
+        color = Color.parseColor("#2E8B57")
+        style = Paint.Style.FILL
+        isAntiAlias = true
+    }
+    private val trunkPaint = Paint().apply {
+        color = Color.parseColor("#5D4037")
+        style = Paint.Style.FILL
+    }
+
+    // Данные для фона (деревья)
+    private var treePositions: List<Float> = emptyList()
 
     init {
         try {
@@ -121,7 +152,81 @@ class GameView @JvmOverloads constructor(
         deathFlashTimer = 0
         cameraX = 0f
 
+        // Генерируем деревья для фона (случайно по всей длине уровня)
+        val totalWidth = w * 3f
+        val list = mutableListOf<Float>()
+        var x = 0f
+        while (x < totalWidth) {
+            list.add(x)
+            x += Random.nextFloat() * 100f + 80f
+        }
+        treePositions = list
+
         initialized = true
+    }
+
+    private fun drawBackground(canvas: Canvas) {
+        val w = width.toFloat()
+        val h = height.toFloat()
+
+        // Небо — градиент
+        val skyShader = LinearGradient(
+            0f, 0f, 0f, h,
+            intArrayOf(
+                Color.parseColor("#1A3A5C"),  // тёмно-синее сверху
+                Color.parseColor("#2E5D4F"),  // зелёный горизонт
+                Color.parseColor("#1A1A1A")   // тёмное внизу
+            ),
+            floatArrayOf(0f, 0.6f, 1f),
+            Shader.TileMode.CLAMP
+        )
+        bgPaint.shader = skyShader
+        canvas.drawRect(0f, 0f, w, h, bgPaint)
+        bgPaint.shader = null
+
+        // Далёкие горы (пиксельные)
+        val mountainPath = Path()
+        mountainPath.moveTo(0f, h * 0.75f)
+        var mx = 0f
+        while (mx < w + 100f) {
+            mountainPath.lineTo(mx, h * 0.55f)
+            mountainPath.lineTo(mx + 80f, h * 0.75f)
+            mx += 160f
+        }
+        mountainPath.lineTo(w, h * 0.75f)
+        mountainPath.lineTo(w, h * 0.85f)
+        mountainPath.lineTo(0f, h * 0.85f)
+        mountainPath.close()
+        bgPaint.color = Color.parseColor("#2A4A3A")
+        canvas.drawPath(mountainPath, bgPaint)
+
+        // Деревья (в 3 слоя — для глубины)
+        val camOffset = cameraX
+        // Далёкий слой (не двигается)
+        drawTreeLayer(canvas, camOffset * 0.3f, 0.72f, 40f, farTreePaint)
+        // Средний слой (двигается медленно)
+        drawTreeLayer(canvas, camOffset * 0.6f, 0.78f, 60f, midTreePaint)
+        // Ближний слой (двигается быстрее)
+        drawTreeLayer(canvas, camOffset * 0.9f, 0.84f, 80f, nearTreePaint)
+    }
+
+    private fun drawTreeLayer(canvas: Canvas, offset: Float, baseYRatio: Float, size: Float, treePaint: Paint) {
+        val h = height.toFloat()
+        val baseY = h * baseYRatio
+
+        for (treeX in treePositions) {
+            val screenX = treeX - offset
+            if (screenX < -size * 2 || screenX > width + size * 2) continue
+
+            // Ствол
+            canvas.drawRect(screenX + size * 0.35f, baseY, screenX + size * 0.65f, baseY + size * 0.4f, trunkPaint)
+
+            // Крона — пиксельная (из трёх прямоугольников)
+            treePaint.alpha = 255
+            canvas.drawRect(screenX, baseY - size * 0.4f, screenX + size, baseY, treePaint)
+            canvas.drawRect(screenX + size * 0.15f, baseY - size * 0.7f, screenX + size * 0.85f, baseY - size * 0.3f, treePaint)
+            canvas.drawRect(screenX + size * 0.3f, baseY - size * 0.9f, screenX + size * 0.7f, baseY - size * 0.6f, treePaint)
+        }
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -133,7 +238,8 @@ class GameView @JvmOverloads constructor(
 
         val data = levelData ?: return
 
-        canvas.drawColor(Color.parseColor("#1A1A1A"))
+        // Фон (рисуется до всего остального)
+        drawBackground(canvas)
 
         val w = width.toFloat()
         val targetCamX = (playerX - w * 0.35f).coerceAtLeast(0f)
