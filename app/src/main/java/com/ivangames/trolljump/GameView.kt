@@ -111,6 +111,10 @@ class GameView @JvmOverloads constructor(
         color = Color.parseColor("#1A1A1A")
         style = Paint.Style.FILL
     }
+    private val charPaintWhite = Paint().apply {
+        color = Color.WHITE
+        style = Paint.Style.FILL
+    }
 
     // Краски для фона Леса
     private val farTreePaint = Paint().apply {
@@ -229,6 +233,7 @@ class GameView @JvmOverloads constructor(
         val px = playerX
         val py = playerY
 
+        // Анимация ходьбы
         if (velocityX != 0f && onGround) {
             isWalking = true
             walkTimer = (walkTimer + 1) % 20
@@ -238,34 +243,59 @@ class GameView @JvmOverloads constructor(
             isWalking = false
         }
 
+        // Смещение ног
         val legOffset = if (isWalking) {
             if (walkTimer < 10) 6f else -6f
         } else 0f
 
+        // Голова
         val headW = size * 0.40f
         val headH = size * 0.30f
         val headX = px + size * 0.30f
         val headY = py
 
+        // Тело
         val bodyW = size * 0.70f
         val bodyH = size * 0.40f
         val bodyX = px + size * 0.15f
         val bodyY = py + size * 0.30f
 
+        // Ноги
         val legW = size * 0.20f
         val legH = size * 0.30f
         val legY = py + size * 0.70f
         val leftLegX = px + size * 0.20f + legOffset
         val rightLegX = px + size * 0.60f - legOffset
 
-        // Левая нога
+        // Рисуем части тела
         canvas.drawRect(leftLegX, legY, leftLegX + legW, legY + legH, charPaint)
-        // Правая нога
         canvas.drawRect(rightLegX, legY, rightLegX + legW, legY + legH, charPaint)
-        // Тело
         canvas.drawRect(bodyX, bodyY, bodyX + bodyW, bodyY + bodyH, charPaint)
-        // Голова
         canvas.drawRect(headX, headY, headX + headW, headY + headH, charPaint)
+
+        // Глаза — смещаются в сторону движения
+        val eyeSize = size * 0.06f
+        val eyeY = headY + headH * 0.40f
+        val eyeSpacing = size * 0.09f
+
+        // Позиция глаз: сдвигаем в сторону взгляда
+        val eyeShift = if (facingRight) size * 0.06f else -size * 0.06f
+        val eyeCenterX = headX + headW / 2f + eyeShift
+
+        canvas.drawRect(
+            eyeCenterX - eyeSpacing / 2f - eyeSize / 2f,
+            eyeY,
+            eyeCenterX - eyeSpacing / 2f + eyeSize / 2f,
+            eyeY + eyeSize,
+            charPaintWhite
+        )
+        canvas.drawRect(
+            eyeCenterX + eyeSpacing / 2f - eyeSize / 2f,
+            eyeY,
+            eyeCenterX + eyeSpacing / 2f + eyeSize / 2f,
+            eyeY + eyeSize,
+            charPaintWhite
+        )
     }
 
     override fun onDraw(canvas: Canvas) {
