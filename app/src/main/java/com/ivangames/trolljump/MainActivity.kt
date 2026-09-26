@@ -25,6 +25,7 @@ class MainActivity : AppCompatActivity() {
         currentLevel = intent.getIntExtra("level", 1)
 
         gameView = findViewById(R.id.gameView)
+        gameView.levelNumber = currentLevel
         winOverlay = findViewById(R.id.winOverlay)
         winText = findViewById(R.id.winText)
 
