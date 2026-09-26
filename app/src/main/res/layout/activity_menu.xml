@@ -3,43 +3,132 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#1A1A1A"
-    android:gravity="center">
+    android:background="#1A1A1A">
 
     <TextView
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="TrollJump"
         android:textColor="#FFC107"
-        android:textSize="48sp"
+        android:textSize="36sp"
         android:textStyle="bold"
-        android:layout_marginBottom="80dp" />
-
-    <LinearLayout
-        android:id="@+id/forestBtn"
-        android:layout_width="160dp"
-        android:layout_height="160dp"
-        android:orientation="vertical"
         android:gravity="center"
-        android:background="@drawable/world_circle"
-        android:clickable="true"
-        android:focusable="true">
+        android:padding="16dp" />
 
-        <TextView
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:scrollbars="none">
+
+        <LinearLayout
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="🌳"
-            android:textSize="64sp" />
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="48dp">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Лес"
-            android:textColor="#FFFFFF"
-            android:textSize="20sp"
-            android:textStyle="bold"
-            android:layout_marginTop="8dp" />
+            <!-- ЛЕС -->
+            <LinearLayout
+                android:id="@+id/forestBtn"
+                android:layout_width="140dp"
+                android:layout_height="140dp"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:background="@drawable/world_circle"
+                android:clickable="true"
+                android:focusable="true">
 
-    </LinearLayout>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🌳"
+                    android:textSize="52sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Лес"
+                    android:textColor="#FFFFFF"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:layout_marginTop="4dp" />
+
+            </LinearLayout>
+
+            <!-- Полоска 1 -->
+            <View
+                android:id="@+id/line1"
+                android:layout_width="80dp"
+                android:layout_height="10dp"
+                android:background="#444444"
+                android:layout_marginHorizontal="8dp" />
+
+            <!-- ГОРЫ -->
+            <LinearLayout
+                android:id="@+id/mountainsBtn"
+                android:layout_width="140dp"
+                android:layout_height="140dp"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:background="@drawable/world_circle_gray"
+                android:clickable="true"
+                android:focusable="true">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🏔"
+                    android:textSize="52sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Горы"
+                    android:textColor="#FFFFFF"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:layout_marginTop="4dp" />
+
+            </LinearLayout>
+
+            <!-- Полоска 2 -->
+            <View
+                android:id="@+id/line2"
+                android:layout_width="80dp"
+                android:layout_height="10dp"
+                android:background="#444444"
+                android:layout_marginHorizontal="8dp" />
+
+            <!-- МОРЕ -->
+            <LinearLayout
+                android:id="@+id/seaBtn"
+                android:layout_width="140dp"
+                android:layout_height="140dp"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:background="@drawable/world_circle_gray"
+                android:clickable="true"
+                android:focusable="true">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🌊"
+                    android:textSize="52sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Море"
+                    android:textColor="#FFFFFF"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:layout_marginTop="4dp" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+    </HorizontalScrollView>
 
 </LinearLayout>

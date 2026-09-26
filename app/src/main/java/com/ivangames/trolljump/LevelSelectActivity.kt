@@ -12,7 +12,13 @@ class LevelSelectActivity : AppCompatActivity() {
         setContentView(R.layout.activity_level_select)
 
         val world = intent.getStringExtra("world") ?: "forest"
-
+        val titleView = findViewById<android.widget.TextView>(R.id.worldTitle)
+titleView.text = when (world) {
+    "forest" -> "🌳 Лес"
+    "mountains" -> "🏔 Горы"
+    "sea" -> "🌊 Море"
+    else -> "🌳 Лес"
+}
         val buttons = listOf(
             findViewById<Button>(R.id.level1),
             findViewById<Button>(R.id.level2),

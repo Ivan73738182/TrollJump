@@ -6,15 +6,16 @@
     android:background="#1A1A1A"
     android:padding="12dp">
 
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="🌳 Лес"
-        android:textColor="#FFC107"
-        android:textSize="24sp"
-        android:textStyle="bold"
-        android:gravity="center"
-        android:layout_marginBottom="8dp" />
+<TextView
+    android:id="@+id/worldTitle"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:text="🌳 Лес"
+    android:textColor="#FFC107"
+    android:textSize="24sp"
+    android:textStyle="bold"
+    android:gravity="center"
+    android:layout_marginBottom="8dp" />
 
     <ScrollView
         android:layout_width="match_parent"
