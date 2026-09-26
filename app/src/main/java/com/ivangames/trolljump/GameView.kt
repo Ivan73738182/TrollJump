@@ -64,35 +64,24 @@ class GameView @JvmOverloads constructor(
     private var facingRight = true
     private var isWalking = false
 
-    // Краски для объектов
-    private val platformPaint = Paint().apply {
-        color = Color.parseColor("#8B7355")
-        style = Paint.Style.FILL
-    }
-    private val disappearingPaint = Paint().apply {
-        color = Color.parseColor("#A0522D")
-        style = Paint.Style.FILL
-    }
+    // Краски (будут меняться в зависимости от мира)
+    private var platformColor = "#8B7355"
+    private var disappearingColor = "#A0522D"
+    private var spikeColor = "#E53935"
+    private var ceilingColor = "#666666"
+    private var ceilingActiveColor = "#B71C1C"
+    private var doorColor = "#4FC3F7"
+
+    private val platformPaint = Paint().apply { style = Paint.Style.FILL }
+    private val disappearingPaint = Paint().apply { style = Paint.Style.FILL }
     private val gonePaint = Paint().apply {
         color = Color.parseColor("#333333")
         style = Paint.Style.FILL
     }
-    private val doorPaint = Paint().apply {
-        color = Color.parseColor("#4FC3F7")
-        style = Paint.Style.FILL
-    }
-    private val spikePaint = Paint().apply {
-        color = Color.parseColor("#E53935")
-        style = Paint.Style.FILL
-    }
-    private val ceilingPaint = Paint().apply {
-        color = Color.parseColor("#666666")
-        style = Paint.Style.FILL
-    }
-    private val ceilingActivePaint = Paint().apply {
-        color = Color.parseColor("#B71C1C")
-        style = Paint.Style.FILL
-    }
+    private val doorPaint = Paint().apply { style = Paint.Style.FILL }
+    private val spikePaint = Paint().apply { style = Paint.Style.FILL }
+    private val ceilingPaint = Paint().apply { style = Paint.Style.FILL }
+    private val ceilingActivePaint = Paint().apply { style = Paint.Style.FILL }
     private val deathOverlayPaint = Paint().apply {
         color = Color.parseColor("#CCFF0000")
         style = Paint.Style.FILL
@@ -115,29 +104,13 @@ class GameView @JvmOverloads constructor(
         color = Color.WHITE
         style = Paint.Style.FILL
     }
-
-    // Краски для фона Леса
-    private val farTreePaint = Paint().apply {
-        color = Color.parseColor("#1B4A2E")
-        style = Paint.Style.FILL
-        isAntiAlias = true
-    }
-    private val midTreePaint = Paint().apply {
-        color = Color.parseColor("#236B3F")
-        style = Paint.Style.FILL
-        isAntiAlias = true
-    }
-    private val nearTreePaint = Paint().apply {
-        color = Color.parseColor("#2E8B57")
-        style = Paint.Style.FILL
-        isAntiAlias = true
-    }
     private val trunkPaint = Paint().apply {
         color = Color.parseColor("#5D4037")
         style = Paint.Style.FILL
     }
 
     private var treePositions: List<Float> = emptyList()
+    private var mountainPositions: List<Float> = emptyList()
 
     init {
         try {
@@ -147,10 +120,46 @@ class GameView @JvmOverloads constructor(
         }
     }
 
+    private fun applyWorldColors() {
+        when (world) {
+            "mountains" -> {
+                platformColor = "#78909C"      // серый камень
+                disappearingColor = "#90A4AE"  // светло-серый
+                spikeColor = "#81D4FA"         // голубые сосульки
+                ceilingColor = "#546E7A"
+                ceilingActiveColor = "#37474F"
+                doorColor = "#FFFFFF"          // белая дверь
+            }
+            "sea" -> {
+                platformColor = "#FFE0B2"      // песочный
+                disappearingColor = "#FFCC80"
+                spikeColor = "#AB47BC"         // фиолетовые кораллы
+                ceilingColor = "#0288D1"
+                ceilingActiveColor = "#01579B"
+                doorColor = "#00E5FF"          // бирюзовая дверь
+            }
+            else -> { // forest
+                platformColor = "#8B7355"
+                disappearingColor = "#A0522D"
+                spikeColor = "#E53935"
+                ceilingColor = "#666666"
+                ceilingActiveColor = "#B71C1C"
+                doorColor = "#4FC3F7"
+            }
+        }
+        platformPaint.color = Color.parseColor(platformColor)
+        disappearingPaint.color = Color.parseColor(disappearingColor)
+        spikePaint.color = Color.parseColor(spikeColor)
+        ceilingPaint.color = Color.parseColor(ceilingColor)
+        ceilingActivePaint.color = Color.parseColor(ceilingActiveColor)
+        doorPaint.color = Color.parseColor(doorColor)
+    }
+
     private fun setupLevel() {
         val w = width.toFloat()
         val h = height.toFloat()
 
+        applyWorldColors()
         levelData = Levels.buildLevel(levelNumber, w, h)
 
         playerX = w * 0.10f
@@ -162,19 +171,37 @@ class GameView @JvmOverloads constructor(
         deathFlashTimer = 0
         cameraX = 0f
 
+        // Генерируем позиции деревьев
         val totalWidth = w * 3f
-        val list = mutableListOf<Float>()
+        val treeList = mutableListOf<Float>()
         var x = 0f
         while (x < totalWidth) {
-            list.add(x)
+            treeList.add(x)
             x += Random.nextFloat() * 100f + 80f
         }
-        treePositions = list
+        treePositions = treeList
+
+        // Генерируем позиции гор
+        val mountainList = mutableListOf<Float>()
+        x = 0f
+        while (x < totalWidth) {
+            mountainList.add(x)
+            x += Random.nextFloat() * 200f + 150f
+        }
+        mountainPositions = mountainList
 
         initialized = true
     }
 
     private fun drawBackground(canvas: Canvas) {
+        when (world) {
+            "mountains" -> drawMountainBackground(canvas)
+            "sea" -> drawSeaBackground(canvas)
+            else -> drawForestBackground(canvas)
+        }
+    }
+
+    private fun drawForestBackground(canvas: Canvas) {
         val w = width.toFloat()
         val h = height.toFloat()
 
@@ -192,6 +219,7 @@ class GameView @JvmOverloads constructor(
         canvas.drawRect(0f, 0f, w, h, bgPaint)
         bgPaint.shader = null
 
+        // Далёкие горы
         val mountainPath = Path()
         mountainPath.moveTo(0f, h * 0.75f)
         var mx = 0f
@@ -208,9 +236,9 @@ class GameView @JvmOverloads constructor(
         canvas.drawPath(mountainPath, bgPaint)
 
         val camOffset = cameraX
-        drawTreeLayer(canvas, camOffset * 0.3f, 0.72f, 40f, farTreePaint)
-        drawTreeLayer(canvas, camOffset * 0.6f, 0.78f, 60f, midTreePaint)
-        drawTreeLayer(canvas, camOffset * 0.9f, 0.84f, 80f, nearTreePaint)
+        drawTreeLayer(canvas, camOffset * 0.3f, 0.72f, 40f, Paint().apply { color = Color.parseColor("#1B4A2E"); style = Paint.Style.FILL })
+        drawTreeLayer(canvas, camOffset * 0.6f, 0.78f, 60f, Paint().apply { color = Color.parseColor("#236B3F"); style = Paint.Style.FILL })
+        drawTreeLayer(canvas, camOffset * 0.9f, 0.84f, 80f, Paint().apply { color = Color.parseColor("#2E8B57"); style = Paint.Style.FILL })
     }
 
     private fun drawTreeLayer(canvas: Canvas, offset: Float, baseYRatio: Float, size: Float, treePaint: Paint) {
@@ -228,12 +256,108 @@ class GameView @JvmOverloads constructor(
         }
     }
 
+    private fun drawMountainBackground(canvas: Canvas) {
+        val w = width.toFloat()
+        val h = height.toFloat()
+
+        // Небо — холодное, серо-синее
+        val skyShader = LinearGradient(
+            0f, 0f, 0f, h,
+            intArrayOf(
+                Color.parseColor("#4A6B8A"),
+                Color.parseColor("#7BA0C0"),
+                Color.parseColor("#2A3A4A")
+            ),
+            floatArrayOf(0f, 0.5f, 1f),
+            Shader.TileMode.CLAMP
+        )
+        bgPaint.shader = skyShader
+        canvas.drawRect(0f, 0f, w, h, bgPaint)
+        bgPaint.shader = null
+
+        // Снежные горы (параллакс)
+        val camOffset = cameraX
+        drawMountainLayer(canvas, camOffset * 0.3f, 0.75f, 120f, Color.parseColor("#E0E8F0"))  // далёкие (снег)
+        drawMountainLayer(canvas, camOffset * 0.6f, 0.82f, 160f, Color.parseColor("#B0C0D0"))  // средние
+        drawMountainLayer(canvas, camOffset * 0.9f, 0.88f, 200f, Color.parseColor("#8090A0"))  // ближние
+    }
+
+    private fun drawMountainLayer(canvas: Canvas, offset: Float, baseYRatio: Float, size: Float, color: Int) {
+        val h = height.toFloat()
+        val baseY = h * baseYRatio
+
+        val paint = Paint().apply {
+            this.color = color
+            style = Paint.Style.FILL
+            isAntiAlias = true
+        }
+
+        for (mountainX in mountainPositions) {
+            val screenX = mountainX - offset
+            if (screenX < -size * 2 || screenX > width + size * 2) continue
+
+            val path = Path()
+            path.moveTo(screenX, baseY)
+            path.lineTo(screenX + size / 2, baseY - size * 0.6f)
+            path.lineTo(screenX + size, baseY)
+            path.close()
+            canvas.drawPath(path, paint)
+        }
+    }
+
+    private fun drawSeaBackground(canvas: Canvas) {
+        val w = width.toFloat()
+        val h = height.toFloat()
+
+        // Вода — сверху вниз, тёмно-синяя → бирюзовая
+        val skyShader = LinearGradient(
+            0f, 0f, 0f, h,
+            intArrayOf(
+                Color.parseColor("#0D47A1"),  // глубокое море
+                Color.parseColor("#1976D2"),  // синее
+                Color.parseColor("#00ACC1")   // бирюзовое
+            ),
+            floatArrayOf(0f, 0.5f, 1f),
+            Shader.TileMode.CLAMP
+        )
+        bgPaint.shader = skyShader
+        canvas.drawRect(0f, 0f, w, h, bgPaint)
+        bgPaint.shader = null
+
+        // Пузырьки (пиксельные кружки)
+        val bubblePaint = Paint().apply {
+            color = Color.parseColor("#80E0FF")
+            style = Paint.Style.FILL
+            alpha = 120
+        }
+        val camOffset = cameraX
+        for (i in 0 until 40) {
+            val bx = (i * 137f - camOffset * 0.5f) % (w + 200f) - 100f
+            val by = (i * 73f) % h
+            val bs = 8f + (i % 5) * 4f
+            canvas.drawCircle(bx, by, bs, bubblePaint)
+        }
+
+        // Водоросли снизу
+        val weedPaint = Paint().apply {
+            color = Color.parseColor("#1B5E20")
+            style = Paint.Style.FILL
+        }
+        for (i in 0 until 20) {
+            val wx = (i * 200f - camOffset * 0.7f) % (w + 400f) - 200f
+            val baseY = h * 0.92f
+            for (j in 0 until 3) {
+                val offsetX = j * 12f - 12f
+                canvas.drawRect(wx + offsetX, baseY - 60f + j * 10f, wx + offsetX + 8f, baseY, weedPaint)
+            }
+        }
+    }
+
     private fun drawCharacter(canvas: Canvas) {
         val size = playerSize
         val px = playerX
         val py = playerY
 
-        // Анимация ходьбы
         if (velocityX != 0f && onGround) {
             isWalking = true
             walkTimer = (walkTimer + 1) % 20
@@ -243,42 +367,35 @@ class GameView @JvmOverloads constructor(
             isWalking = false
         }
 
-        // Смещение ног
         val legOffset = if (isWalking) {
             if (walkTimer < 10) 6f else -6f
         } else 0f
 
-        // Голова
         val headW = size * 0.40f
         val headH = size * 0.30f
         val headX = px + size * 0.30f
         val headY = py
 
-        // Тело
         val bodyW = size * 0.70f
         val bodyH = size * 0.40f
         val bodyX = px + size * 0.15f
         val bodyY = py + size * 0.30f
 
-        // Ноги
         val legW = size * 0.20f
         val legH = size * 0.30f
         val legY = py + size * 0.70f
         val leftLegX = px + size * 0.20f + legOffset
         val rightLegX = px + size * 0.60f - legOffset
 
-        // Рисуем части тела
         canvas.drawRect(leftLegX, legY, leftLegX + legW, legY + legH, charPaint)
         canvas.drawRect(rightLegX, legY, rightLegX + legW, legY + legH, charPaint)
         canvas.drawRect(bodyX, bodyY, bodyX + bodyW, bodyY + bodyH, charPaint)
         canvas.drawRect(headX, headY, headX + headW, headY + headH, charPaint)
 
-        // Глаза — смещаются в сторону движения
         val eyeSize = size * 0.06f
         val eyeY = headY + headH * 0.40f
         val eyeSpacing = size * 0.09f
 
-        // Позиция глаз: сдвигаем в сторону взгляда
         val eyeShift = if (facingRight) size * 0.06f else -size * 0.06f
         val eyeCenterX = headX + headW / 2f + eyeShift
 
