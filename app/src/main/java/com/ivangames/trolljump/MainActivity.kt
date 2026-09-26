@@ -63,11 +63,12 @@ class MainActivity : AppCompatActivity() {
             winOverlay.visibility = FrameLayout.VISIBLE
         }
 
-        findViewById<Button>(R.id.winBackBtn).setOnClickListener {
-            val intent = Intent(this, LevelSelectActivity::class.java)
-            intent.putExtra("world", currentWorld)
-            startActivity(intent)
-            finish()
-        }
+findViewById<Button>(R.id.winBackBtn).setOnClickListener {
+    val intent = Intent(this, LevelSelectActivity::class.java)
+    intent.putExtra("world", currentWorld)
+    intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+    startActivity(intent)
+    finish()
+}
     }
 }

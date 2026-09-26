@@ -5,6 +5,8 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
+import android.media.AudioManager
+import android.media.ToneGenerator
 import android.util.AttributeSet
 import android.view.View
 
@@ -49,6 +51,9 @@ class GameView @JvmOverloads constructor(
 
     var onLevelComplete: (() -> Unit)? = null
 
+    // Звук
+    private var toneGen: ToneGenerator? = null
+
     // Краски
     private val playerPaint = Paint().apply {
         color = Color.parseColor("#FFC107")
@@ -91,6 +96,14 @@ class GameView @JvmOverloads constructor(
         textSize = 50f
         isAntiAlias = true
         isFakeBoldText = true
+    }
+
+    init {
+        try {
+            toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 80)
+        } catch (e: Exception) {
+            toneGen = null
+        }
     }
 
     private fun setupLevel() {
@@ -243,6 +256,7 @@ class GameView @JvmOverloads constructor(
         if (jump && onGround) {
             velocityY = jumpPower
             onGround = false
+            playTone(ToneGenerator.TONE_PROP_BEEP, 80)
         }
 
         if (playerX < 0) playerX = 0f
@@ -253,6 +267,7 @@ class GameView @JvmOverloads constructor(
         }
 
         if (RectF.intersects(data.door, RectF(playerX, playerY, playerX + playerSize, playerY + playerSize))) {
+            playTone(ToneGenerator.TONE_PROP_ACK, 300)
             onLevelComplete?.invoke()
         }
     }
@@ -262,6 +277,7 @@ class GameView @JvmOverloads constructor(
         isDead = true
         deaths++
         deathFlashTimer = 30
+        playTone(ToneGenerator.TONE_CDMA_ABBR_ALERT, 200)
     }
 
     private fun performRespawn() {
@@ -283,5 +299,23 @@ class GameView @JvmOverloads constructor(
             c.rect.bottom = height * 0.15f
         }
         isDead = false
+    }
+
+    private fun playTone(tone: Int, durationMs: Int) {
+        try {
+            toneGen?.startTone(tone, durationMs)
+        } catch (e: Exception) {
+            // ignore
+        }
+    }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        try {
+            toneGen?.release()
+        } catch (e: Exception) {
+            // ignore
+        }
+        toneGen = null
     }
 }
