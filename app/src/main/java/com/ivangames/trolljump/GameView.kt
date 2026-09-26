@@ -59,6 +59,11 @@ class GameView @JvmOverloads constructor(
     // Звук
     private var toneGen: ToneGenerator? = null
 
+    // Анимация персонажа
+    private var walkTimer = 0
+    private var facingRight = true
+    private var isWalking = false
+
     // Краски
     private val playerPaint = Paint().apply {
         color = Color.parseColor("#FFC107")
@@ -106,6 +111,30 @@ class GameView @JvmOverloads constructor(
         style = Paint.Style.FILL
         isAntiAlias = true
     }
+
+    // Краски для персонажа
+    private val bodyPaint = Paint().apply {
+        color = Color.parseColor("#FFC107")
+        style = Paint.Style.FILL
+    }
+    private val bodyDarkPaint = Paint().apply {
+        color = Color.parseColor("#E0A800")
+        style = Paint.Style.FILL
+    }
+    private val eyeWhitePaint = Paint().apply {
+        color = Color.WHITE
+        style = Paint.Style.FILL
+    }
+    private val eyePupilPaint = Paint().apply {
+        color = Color.parseColor("#1A1A1A")
+        style = Paint.Style.FILL
+    }
+    private val mouthPaint = Paint().apply {
+        color = Color.parseColor("#1A1A1A")
+        style = Paint.Style.FILL
+    }
+
+    // Краски для фона Леса
     private val farTreePaint = Paint().apply {
         color = Color.parseColor("#1B4A2E")
         style = Paint.Style.FILL
@@ -152,7 +181,7 @@ class GameView @JvmOverloads constructor(
         deathFlashTimer = 0
         cameraX = 0f
 
-        // Генерируем деревья для фона (случайно по всей длине уровня)
+        // Генерируем деревья для фона
         val totalWidth = w * 3f
         val list = mutableListOf<Float>()
         var x = 0f
@@ -173,9 +202,9 @@ class GameView @JvmOverloads constructor(
         val skyShader = LinearGradient(
             0f, 0f, 0f, h,
             intArrayOf(
-                Color.parseColor("#1A3A5C"),  // тёмно-синее сверху
-                Color.parseColor("#2E5D4F"),  // зелёный горизонт
-                Color.parseColor("#1A1A1A")   // тёмное внизу
+                Color.parseColor("#1A3A5C"),
+                Color.parseColor("#2E5D4F"),
+                Color.parseColor("#1A1A1A")
             ),
             floatArrayOf(0f, 0.6f, 1f),
             Shader.TileMode.CLAMP
@@ -184,7 +213,7 @@ class GameView @JvmOverloads constructor(
         canvas.drawRect(0f, 0f, w, h, bgPaint)
         bgPaint.shader = null
 
-        // Далёкие горы (пиксельные)
+        // Далёкие горы
         val mountainPath = Path()
         mountainPath.moveTo(0f, h * 0.75f)
         var mx = 0f
@@ -200,13 +229,10 @@ class GameView @JvmOverloads constructor(
         bgPaint.color = Color.parseColor("#2A4A3A")
         canvas.drawPath(mountainPath, bgPaint)
 
-        // Деревья (в 3 слоя — для глубины)
+        // Деревья (3 слоя — параллакс)
         val camOffset = cameraX
-        // Далёкий слой (не двигается)
         drawTreeLayer(canvas, camOffset * 0.3f, 0.72f, 40f, farTreePaint)
-        // Средний слой (двигается медленно)
         drawTreeLayer(canvas, camOffset * 0.6f, 0.78f, 60f, midTreePaint)
-        // Ближний слой (двигается быстрее)
         drawTreeLayer(canvas, camOffset * 0.9f, 0.84f, 80f, nearTreePaint)
     }
 
@@ -221,12 +247,120 @@ class GameView @JvmOverloads constructor(
             // Ствол
             canvas.drawRect(screenX + size * 0.35f, baseY, screenX + size * 0.65f, baseY + size * 0.4f, trunkPaint)
 
-            // Крона — пиксельная (из трёх прямоугольников)
-            treePaint.alpha = 255
+            // Крона — пиксельная (3 прямоугольника)
             canvas.drawRect(screenX, baseY - size * 0.4f, screenX + size, baseY, treePaint)
             canvas.drawRect(screenX + size * 0.15f, baseY - size * 0.7f, screenX + size * 0.85f, baseY - size * 0.3f, treePaint)
             canvas.drawRect(screenX + size * 0.3f, baseY - size * 0.9f, screenX + size * 0.7f, baseY - size * 0.6f, treePaint)
         }
+    }
+
+    private fun drawCharacter(canvas: Canvas) {
+        val size = playerSize
+        val px = playerX
+        val py = playerY
+
+        // Анимация ходьбы
+        if (velocityX != 0f && onGround) {
+            isWalking = true
+            walkTimer = (walkTimer + 1) % 20
+            if (velocityX > 0) facingRight = true
+            else if (velocityX < 0) facingRight = false
+        } else {
+            isWalking = false
+        }
+
+        // Ноги
+        val legOffset = if (isWalking) {
+            if (walkTimer < 10) 4f else -4f
+        } else 0f
+
+        val legWidth = size * 0.18f
+        val legHeight = size * 0.22f
+        val legY = py + size * 0.78f
+
+        // Левая нога
+        canvas.drawRect(
+            px + size * 0.22f,
+            legY + legOffset,
+            px + size * 0.22f + legWidth,
+            legY + legHeight,
+            bodyDarkPaint
+        )
+
+        // Правая нога
+        canvas.drawRect(
+            px + size * 0.60f,
+            legY - legOffset,
+            px + size * 0.60f + legWidth,
+            legY + legHeight,
+            bodyDarkPaint
+        )
+
+        // Тело
+        canvas.drawRect(
+            px + size * 0.15f,
+            py + size * 0.45f,
+            px + size * 0.85f,
+            py + size * 0.82f,
+            bodyPaint
+        )
+
+        // Голова
+        canvas.drawRect(
+            px + size * 0.18f,
+            py + size * 0.10f,
+            px + size * 0.82f,
+            py + size * 0.48f,
+            bodyPaint
+        )
+
+        // Глаза
+        val eyeSize = size * 0.14f
+        val eyeY = py + size * 0.22f
+        val eyeSpacing = size * 0.20f
+
+        val eyeXLeft: Float
+        val eyeXRight: Float
+        if (facingRight) {
+            eyeXLeft = px + size * 0.30f
+            eyeXRight = px + size * 0.30f + eyeSpacing
+        } else {
+            eyeXLeft = px + size * 0.50f
+            eyeXRight = px + size * 0.50f + eyeSpacing
+        }
+
+        // Белки
+        canvas.drawRect(eyeXLeft, eyeY, eyeXLeft + eyeSize, eyeY + eyeSize, eyeWhitePaint)
+        canvas.drawRect(eyeXRight, eyeY, eyeXRight + eyeSize, eyeY + eyeSize, eyeWhitePaint)
+
+        // Зрачки
+        val pupilSize = eyeSize * 0.5f
+        val pupilOffsetX = if (facingRight) eyeSize * 0.3f else 0f
+        val pupilOffsetY = eyeSize * 0.25f
+
+        canvas.drawRect(
+            eyeXLeft + pupilOffsetX,
+            eyeY + pupilOffsetY,
+            eyeXLeft + pupilOffsetX + pupilSize,
+            eyeY + pupilOffsetY + pupilSize,
+            eyePupilPaint
+        )
+        canvas.drawRect(
+            eyeXRight + pupilOffsetX,
+            eyeY + pupilOffsetY,
+            eyeXRight + pupilOffsetX + pupilSize,
+            eyeY + pupilOffsetY + pupilSize,
+            eyePupilPaint
+        )
+
+        // Рот
+        canvas.drawRect(
+            px + size * 0.40f,
+            py + size * 0.42f,
+            px + size * 0.60f,
+            py + size * 0.44f,
+            mouthPaint
+        )
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -238,7 +372,7 @@ class GameView @JvmOverloads constructor(
 
         val data = levelData ?: return
 
-        // Фон (рисуется до всего остального)
+        // Фон
         drawBackground(canvas)
 
         val w = width.toFloat()
@@ -268,11 +402,8 @@ class GameView @JvmOverloads constructor(
 
         canvas.drawRect(data.door, doorPaint)
 
-        canvas.drawRect(
-            playerX, playerY,
-            playerX + playerSize, playerY + playerSize,
-            playerPaint
-        )
+        // Персонаж
+        drawCharacter(canvas)
 
         canvas.restore()
 
